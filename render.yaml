@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: kael-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: OPENROUTER_APP_NAME
+        value: KAEL
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: KAEL_DEV_SECRET
+        sync: false
+      - key: KAEL_ALLOWED_ORIGINS
+        sync: false
+      - key: OPENROUTER_HTTP_REFERER
+        sync: false

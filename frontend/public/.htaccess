@@ -1,0 +1,51 @@
+# KAEL static frontend - InfinityFree / Apache configuration.
+#
+# Upload this file together with the contents of `out/` into `htdocs`.
+# It is copied into `out/` automatically by `npm run build`.
+
+DirectoryIndex index.html
+ErrorDocument 404 /404.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Serve real files and directories as-is.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Never rewrite a missing build asset to index.html.
+  RewriteCond %{REQUEST_URI} ^/_next/ [NC]
+  RewriteRule ^ - [L]
+
+  # Client-side fallback for the single-page app.
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Enable this block after issuing the free SSL certificate in InfinityFree.
+# <IfModule mod_rewrite.c>
+#   RewriteEngine On
+#   RewriteCond %{HTTPS} !=on
+#   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  # Next.js fingerprints these files, so they can be cached forever.
+  <FilesMatch "\.(js|css|woff|woff2|ttf|otf)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  <FilesMatch "\.(png|jpe?g|gif|svg|webp|ico)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+</IfModule>
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml
+  AddOutputFilterByType DEFLATE application/javascript application/json
+  AddOutputFilterByType DEFLATE application/xml image/svg+xml
+</IfModule>
