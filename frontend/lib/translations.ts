@@ -58,6 +58,15 @@ const ru = {
   "landing.description":
     "KAEL разбирает сложное на понятные части, пишет код без лишних абстракций и собирает документы, которые не стыдно открыть.",
 
+  "capabilities.title": "Что умеет KAEL",
+  "capabilities.code.title": "Код",
+  "capabilities.code.description": "Пишет, чинит и объясняет код.",
+  "capabilities.docs.title": "Документы",
+  "capabilities.docs.description": "Собирает README и инструкции.",
+  "capabilities.files.title": "Вложения",
+  "capabilities.files.description": "Читает изображения, PDF и код.",
+  "capabilities.noImages": "Не генерирует картинки и видео",
+
   "starter.explain.title": "Разложить сложное",
   "starter.explain.description":
     "Объяснить идею простыми словами и без маркетинга.",
@@ -311,6 +320,15 @@ const uk: Record<TranslationKey, string> = {
   "landing.description":
     "KAEL розкладає складне на зрозумілі частини, пише код без зайвих абстракцій і збирає документи, які не соромно відкрити.",
 
+  "capabilities.title": "Що вміє KAEL",
+  "capabilities.code.title": "Код",
+  "capabilities.code.description": "Пише, виправляє та пояснює код.",
+  "capabilities.docs.title": "Документи",
+  "capabilities.docs.description": "Збирає README та інструкції.",
+  "capabilities.files.title": "Вкладення",
+  "capabilities.files.description": "Читає зображення, PDF і код.",
+  "capabilities.noImages": "Не генерує зображення та відео",
+
   "starter.explain.title": "Розкласти складне",
   "starter.explain.description":
     "Пояснити ідею простими словами і без маркетингу.",
@@ -560,6 +578,15 @@ const en: Record<TranslationKey, string> = {
   "landing.title2": "Make less noise.",
   "landing.description":
     "KAEL breaks complex ideas into clear pieces, writes code without needless abstraction, and produces documents worth opening.",
+
+  "capabilities.title": "What KAEL can do",
+  "capabilities.code.title": "Code",
+  "capabilities.code.description": "Writes, fixes, and explains code.",
+  "capabilities.docs.title": "Documents",
+  "capabilities.docs.description": "Builds READMEs and guides.",
+  "capabilities.files.title": "Attachments",
+  "capabilities.files.description": "Reads images, PDFs, and code.",
+  "capabilities.noImages": "Does not generate images or video",
 
   "starter.explain.title": "Break down complexity",
   "starter.explain.description":

@@ -3,10 +3,13 @@
 import {
   ArrowUpRight,
   AudioLines,
+  Code2,
   FileCode2,
   FileText,
+  ImageOff,
   Layers,
   Menu,
+  Paperclip,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -147,6 +150,24 @@ const PROMPT_STARTERS: PromptStarter[] = [
     prompt: "starter.document.prompt",
   },
 ];
+
+const CAPABILITIES = [
+  {
+    icon: Code2,
+    title: "capabilities.code.title",
+    description: "capabilities.code.description",
+  },
+  {
+    icon: FileText,
+    title: "capabilities.docs.title",
+    description: "capabilities.docs.description",
+  },
+  {
+    icon: Paperclip,
+    title: "capabilities.files.title",
+    description: "capabilities.files.description",
+  },
+] as const;
 
 function isChatMessage(value: unknown): value is ChatMessage {
   if (typeof value !== "object" || value === null) {
@@ -334,6 +355,43 @@ function LandingState({
               </div>
             </button>
           ))}
+        </div>
+
+        <div className="mt-7 border-t border-white/[0.07] pt-5">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <span className="kael-display text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">
+              {t("capabilities.title")}
+            </span>
+            <span className="hidden h-px min-w-6 flex-1 bg-white/[0.06] sm:block" />
+            <span className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
+              <ImageOff
+                size={13}
+                strokeWidth={1.6}
+                className="shrink-0 text-zinc-600"
+              />
+              {t("capabilities.noImages")}
+            </span>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-3 sm:gap-5">
+            {CAPABILITIES.map(({ icon: Icon, title, description }) => (
+              <div key={title} className="flex items-start gap-2.5">
+                <Icon
+                  size={17}
+                  strokeWidth={1.6}
+                  className="mt-0.5 shrink-0 text-[#f7a6ba]"
+                />
+                <div>
+                  <p className="text-sm font-medium text-zinc-200">
+                    {t(title)}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-zinc-500">
+                    {t(description)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>

@@ -86,14 +86,17 @@ export const MODEL_GROUPS: ModelGroup[] = [
   },
 ];
 
-export const DEFAULT_MODEL_ID = "openai/gpt-4o-mini";
+// Speed is the main wow factor for new users, so Groq GPT-OSS leads by default.
+// Existing users keep the model saved in localStorage.
+export const DEFAULT_MODEL_ID = "groq/openai/gpt-oss-120b";
+const DEFAULT_OPENROUTER_MODEL_ID = "openai/gpt-4o-mini";
 
 export const ALL_MODELS: ModelOption[] = MODEL_GROUPS.flatMap(
   (group) => group.models,
 );
 
 export const DEFAULT_MODEL_BY_PROVIDER: Record<ProviderId, string> = {
-  openrouter: DEFAULT_MODEL_ID,
+  openrouter: DEFAULT_OPENROUTER_MODEL_ID,
   groq: "groq/openai/gpt-oss-120b",
   ollama: "ollama/llama3",
 };
