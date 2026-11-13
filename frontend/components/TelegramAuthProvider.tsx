@@ -298,6 +298,9 @@ export function TelegramAuthProvider({ children }: { children: ReactNode }) {
                 <a href={BOT_URL} className="kael-btn kael-btn-pulse">
                   {t("auth.openTelegram")}
                 </a>
+                <p className="mt-4 text-xs leading-relaxed text-zinc-500">
+                  {t("auth.openHint")}
+                </p>
               </>
             ) : (
               <p className="mb-4 text-sm text-zinc-500">

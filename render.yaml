@@ -24,6 +24,8 @@ services:
       # Optional comma-separated Telegram user IDs for a closed beta.
       - key: KAEL_ALLOWED_TG_IDS
         sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
       - key: KAEL_DEV_SECRET
         sync: false
       - key: KAEL_ALLOWED_ORIGINS

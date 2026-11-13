@@ -388,7 +388,8 @@ KAEL работает как Telegram Mini App. Отдельной базы по
 
 Как это устроено:
 
-1. Пользователь открывает сайт из бота или по кнопке меню в Telegram.
+1. Пользователь открывает бота и получает кнопку «Открыть KAEL» (бот отвечает
+   на `/start`), либо сразу нажимает кнопку меню в чате.
 2. Фронтенд берёт `window.Telegram.WebApp.initData` и отправляет его на
    `POST /auth/telegram-webapp`.
 3. Бэкенд проверяет подпись `initData` токеном бота (`TELEGRAM_BOT_TOKEN`),
@@ -400,7 +401,32 @@ KAEL работает как Telegram Mini App. Отдельной базы по
 5. `/api/chat` требует этот токен. `/health` остаётся публичным.
 
 Если открыть сайт в обычном браузере, `initData` нет, поэтому показывается экран
-«Доступ только через Telegram Mini App». Это ожидаемое поведение, а не ошибка.
+«Доступ только через Telegram Mini App». Это ожидаемое поведение, а не ошибка:
+вход возможен только внутри Telegram, где клиент сам подписывает данные
+пользователя. Регистрация в чате с ботом не нужна — бот только выдаёт кнопку
+запуска Mini App.
+
+#### Webhook бота
+
+Эндпоинт `POST /telegram/webhook` отвечает на `/start` и другие сообщения в
+личке кнопкой «Открыть KAEL». Он проверяет заголовок
+`X-Telegram-Bot-Api-Secret-Token`, поэтому `TELEGRAM_WEBHOOK_SECRET` должен
+совпадать с `secret_token` при регистрации webhook.
+
+Зарегистрируйте webhook один раз после деплоя:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://kael-api.onrender.com/telegram/webhook",
+    "secret_token": "<TELEGRAM_WEBHOOK_SECRET>",
+    "allowed_updates": ["message"]
+  }'
+```
+
+Проверить статус: `getWebhookInfo`. Если webhook не нужен, его можно удалить
+через `deleteWebhook`.
 
 #### Настройка бота в @BotFather
 
@@ -423,6 +449,7 @@ Telegram открывает Mini App только по HTTPS, поэтому д�
 | Переменная | Обязательна | Назначение |
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | да | токен из @BotFather |
+| `TELEGRAM_WEBHOOK_SECRET` | да | секрет заголовка `X-Telegram-Bot-Api-Secret-Token` |
 | `KAEL_JWT_SECRET` | да | подпись сессионных токенов, длинная случайная строка |
 | `KAEL_ALLOWED_TG_IDS` | нет | ID через запятую для закрытой беты; пусто = все |
 
@@ -451,6 +478,7 @@ NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=your_bot_username
 - [ ] `KAEL_DEV_SECRET` заменён на сильный секрет.
 - [ ] `OPENROUTER_API_KEY` (и/или `GROQ_API_KEY`) задан в панели хостинга.
 - [ ] `TELEGRAM_BOT_TOKEN` задан на Render.
+- [ ] `TELEGRAM_WEBHOOK_SECRET` задан на Render и в `setWebhook`.
 - [ ] `KAEL_JWT_SECRET` задан на Render (длинная случайная строка).
 - [ ] При закрытой бете `KAEL_ALLOWED_TG_IDS` содержит нужные Telegram ID.
 - [ ] `frontend/.env.production` содержит публичный URL бэкенда.

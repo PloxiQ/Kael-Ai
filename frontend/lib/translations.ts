@@ -57,6 +57,8 @@ const ru = {
   "auth.telegramOnly":
     "Доступ к KAEL AI открыт только через Telegram Mini App",
   "auth.openTelegram": "Открыть в Telegram",
+  "auth.openHint":
+    "Открой KAEL из чата с ботом. Обычный браузер не может войти — Telegram передаёт данные только внутри Mini App.",
   "auth.botHint": "Открой KAEL через Telegram-бота.",
   "auth.retry": "Повторить",
   "auth.checkAgain": "Проверить снова",
@@ -349,6 +351,8 @@ const uk: Record<TranslationKey, string> = {
   "auth.telegramOnly":
     "Доступ до KAEL AI відкритий лише через Telegram Mini App",
   "auth.openTelegram": "Відкрити в Telegram",
+  "auth.openHint":
+    "Відкрий KAEL із чату з ботом. Звичайний браузер не може увійти — Telegram передає дані лише всередині Mini App.",
   "auth.botHint": "Відкрий KAEL через Telegram-бота.",
   "auth.retry": "Повторити",
   "auth.checkAgain": "Перевірити ще раз",
@@ -638,6 +642,8 @@ const en: Record<TranslationKey, string> = {
   "auth.telegramOnly":
     "KAEL AI is available only through the Telegram Mini App",
   "auth.openTelegram": "Open in Telegram",
+  "auth.openHint":
+    "Open KAEL from the bot chat. A regular browser cannot sign in — Telegram shares data only inside the Mini App.",
   "auth.botHint": "Open KAEL through the Telegram bot.",
   "auth.retry": "Try again",
   "auth.checkAgain": "Check again",

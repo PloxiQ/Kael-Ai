@@ -17,6 +17,7 @@ from pypdf import PdfReader
 
 from auth import get_current_user
 from auth import router as auth_router
+from telegram_bot import router as telegram_router
 
 
 load_dotenv()
@@ -292,6 +293,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "X-Developer-Secret"],
 )
 app.include_router(auth_router)
+app.include_router(telegram_router)
 
 
 def _system_prompt(mode: ResponseMode, language: Language = "ru") -> str:
