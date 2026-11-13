@@ -9,11 +9,14 @@ from typing import Literal
 
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
 from pydantic import BaseModel, Field
 from pypdf import PdfReader
+
+from auth import get_current_user
+from auth import router as auth_router
 
 
 load_dotenv()
@@ -278,7 +281,7 @@ ALLOWED_ORIGIN_REGEX = (
 app = FastAPI(
     title="KAEL API",
     description="Multi-provider FastAPI backend for KAEL.",
-    version="0.9.0",
+    version="1.0.0",
 )
 app.add_middleware(
     CORSMiddleware,
@@ -288,6 +291,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Developer-Secret"],
 )
+app.include_router(auth_router)
 
 
 def _system_prompt(mode: ResponseMode, language: Language = "ru") -> str:
@@ -856,6 +860,7 @@ def health_check() -> dict[str, str]:
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(
     request: ChatRequest,
+    user: dict = Depends(get_current_user),
     x_developer_secret: str | None = Header(
         default=None, alias="X-Developer-Secret"
     ),

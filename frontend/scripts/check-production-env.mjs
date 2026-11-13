@@ -112,4 +112,13 @@ if (parsed.pathname !== "/" || parsed.search || parsed.hash) {
   );
 }
 
+const botUsername = env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.trim() ?? "";
+if (!botUsername) {
+  console.warn(
+    "[KAEL build check] NEXT_PUBLIC_TELEGRAM_BOT_USERNAME is empty. " +
+      "The login screen will explain Telegram-only access but will not show " +
+      "an 'Open in Telegram' button.",
+  );
+}
+
 console.log(`[KAEL build check] Backend URL: ${rawUrl}`);

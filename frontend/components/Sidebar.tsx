@@ -121,6 +121,7 @@ export default function Sidebar({
           type="button"
           onClick={onNewChat}
           disabled={busy}
+          data-tour="new-chat"
           title={busy ? t("sidebar.wait") : t("sidebar.newChat")}
           className={`group flex w-full items-center gap-3 rounded-xl bg-kael-gradient px-4 py-3 text-sm font-semibold text-[#1c0710] shadow-[0_16px_44px_-18px_rgba(245,87,108,0.7)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 ${
             isCollapsed ? "justify-center px-0" : ""

@@ -173,6 +173,7 @@ export default function ModelSelector({
         type="button"
         onClick={() => setOpen((current) => !current)}
         disabled={disabled}
+        data-tour="model"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}

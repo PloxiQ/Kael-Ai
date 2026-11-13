@@ -6,12 +6,13 @@
 Пользователь
    │
    ├── https://YOUR-SITE.infinityfreeapp.com   (статика Next.js из out/)
-   │        │
-   │        └── fetch NEXT_PUBLIC_KAEL_API_URL
+   │        ├── POST /auth/telegram-webapp      (initData из Telegram)
+   │        └── POST /api/chat                  (Authorization: Bearer ...)
    │
    └── https://YOUR-SERVICE.onrender.com       (FastAPI + uvicorn)
-            ├── GET  /health
-            └── POST /api/chat
+            ├── GET  /health                   (публичный)
+            ├── POST /auth/telegram-webapp     (проверка initData)
+            └── POST /api/chat                 (только с токеном)
 ```
 
 Фронтенд полностью статический: Next.js собирает HTML/CSS/JS в `frontend/out/`.
@@ -58,6 +59,9 @@ Render Blueprint сам найдёт `render.yaml` в корне.
 | `PYTHON_VERSION` | да | `3.11.9` |
 | `OPENROUTER_API_KEY` | да, если используете OpenRouter | ключ с openrouter.ai |
 | `GROQ_API_KEY` | нет | ключ Groq, если нужен провайдер Groq |
+| `TELEGRAM_BOT_TOKEN` | да | токен бота из @BotFather, только на бэкенде |
+| `KAEL_JWT_SECRET` | да | длинный случайный секрет для сессионных токенов |
+| `KAEL_ALLOWED_TG_IDS` | нет | ID пользователей через запятую для закрытой беты; пусто = все |
 | `KAEL_DEV_SECRET` | да | длинный случайный секрет, не `kael-dev-2026` |
 | `KAEL_ALLOWED_ORIGINS` | да | `https://YOUR-SITE.infinityfreeapp.com` |
 | `OPENROUTER_HTTP_REFERER` | желательно | `https://YOUR-SITE.infinityfreeapp.com` |
@@ -73,6 +77,10 @@ Render Blueprint сам найдёт `render.yaml` в корне.
   3001) разрешены всегда, поэтому с тем же бэкендом можно тестировать локально.
 - После изменения переменных Render перезапускает сервис автоматически. Если
   нет — **Manual Deploy → Restart service**.
+- `TELEGRAM_BOT_TOKEN` и `KAEL_JWT_SECRET` — секреты. Не попадают в статический
+  фронтенд и не коммитятся в репозиторий.
+- `KAEL_JWT_SECRET` можно сгенерировать так:
+  `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
 - `OLLAMA_BASE_URL` на облаке не заработает: Ollama должна быть запущена рядом с
   бэкендом. На бесплатном хостинге используйте OpenRouter или Groq.
 
@@ -156,7 +164,11 @@ Copy-Item .env.production.example .env.production
 
 ```dotenv
 NEXT_PUBLIC_KAEL_API_URL=https://kael-api-xxxx.onrender.com
+NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=your_bot_username
 ```
+
+`NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` — публичное имя бота без `@`. Оно нужно для
+кнопки «Открыть в Telegram» на экране блокировки. Это не секрет.
 
 Правила:
 
@@ -334,15 +346,23 @@ npm run preview
 | --- | --- |
 | `frontend/next.config.mjs` | `output: "export"`, `trailingSlash`, `images.unoptimized` |
 | `frontend/package.json` | `npm run build` собирает статику, `npm run preview` — локальный просмотр `out/` |
-| `frontend/.env.production.example` | шаблон публичного URL бэкенда |
-| `frontend/scripts/check-production-env.mjs` | защита от сборки с localhost/LAN URL |
+| `frontend/.env.production.example` | шаблон публичного URL бэкенда и username Telegram-бота |
+| `frontend/scripts/check-production-env.mjs` | защита от сборки с localhost/LAN URL, предупреждение о пустом username бота |
 | `frontend/public/.htaccess` | маршрутизация, 404, кэш и сжатие для InfinityFree |
+| `frontend/components/TelegramAuthProvider.tsx` | вход по `initData`, хранение сессии, экран блокировки |
+| `frontend/components/KaelMascot.tsx` | маскот Spark на экране входа и в туре |
+| `frontend/components/KaelTour.tsx` | локализованный онбординг-тур по интерфейсу |
+| `frontend/components/UserChip.tsx` | аватар и имя пользователя Telegram в шапке |
+| `frontend/lib/api.ts` | `authFetch`, Bearer-токен, сброс сессии при 401 |
+| `frontend/types/telegram.d.ts` | типы Telegram WebApp |
+| `frontend/app/kael-auth.css` | стили экрана входа, маскота и тура |
 | `backend/main.py` | CORS через `KAEL_ALLOWED_ORIGINS` + локальные адреса |
-| `backend/.env.example` | пример CORS-переменных |
+| `backend/auth.py` | проверка `initData`, сессионный токен, allowlist, `get_current_user` |
+| `backend/.env.example` | пример CORS-переменных и Telegram-секретов |
 | `backend/Procfile` | запуск для Koyeb/buildpack |
 | `backend/Dockerfile` | запуск в Docker/Koyeb/HF Spaces |
 | `backend/.python-version` | Python 3.11.9 |
-| `render.yaml` | Blueprint для Render (rootDir: `backend`) |
+| `render.yaml` | Blueprint для Render (rootDir: `backend`, Telegram-секреты) |
 
 ---
 
@@ -363,20 +383,64 @@ npm run preview
 
 ### Telegram-авторизация
 
-> В текущей версии кода KAEL нет эндпоинтов Telegram-авторизации: ни фронтенд,
-> ни `backend/main.py` не содержат проверки `initData`. CORS ниже уже подготовлен
-> на случай, когда эта фича будет добавлена.
+KAEL работает как Telegram Mini App. Отдельной базы пользователей нет: личность
+подтверждает сам Telegram, а сессия живёт в подписанном токене.
 
-Если авторизация через Telegram-бота отправляет данные в заголовке
-`Authorization` (рекомендуемый вариант), текущая CORS-конфигурация уже разрешает
-этот заголовок. Если вы используете cookies, придётся:
+Как это устроено:
 
-1. поставить `allow_credentials=True` в `backend/main.py`;
-2. использовать только точные origins (без `*`);
-3. отправлять `credentials: "include"` на фронтенде.
+1. Пользователь открывает сайт из бота или по кнопке меню в Telegram.
+2. Фронтенд берёт `window.Telegram.WebApp.initData` и отправляет его на
+   `POST /auth/telegram-webapp`.
+3. Бэкенд проверяет подпись `initData` токеном бота (`TELEGRAM_BOT_TOKEN`),
+   проверяет свежесть `auth_date` (не старше 24 часов) и при необходимости
+   сверяет ID с `KAEL_ALLOWED_TG_IDS`.
+4. Бэкенд возвращает временный токен на 7 дней, подписанный `KAEL_JWT_SECRET`.
+   Токен хранится в `localStorage` и отправляется в заголовке
+   `Authorization: Bearer ...`.
+5. `/api/chat` требует этот токен. `/health` остаётся публичным.
 
-Проверка `initData` от Telegram должна выполняться на бэкенде с использованием
-токена бота; не храните токен бота в статическом фронтенде.
+Если открыть сайт в обычном браузере, `initData` нет, поэтому показывается экран
+«Доступ только через Telegram Mini App». Это ожидаемое поведение, а не ошибка.
+
+#### Настройка бота в @BotFather
+
+1. Создайте бота (`/newbot`) или используйте существующего.
+2. Скопируйте токен вида `123456789:AA...` — это `TELEGRAM_BOT_TOKEN`. Токен
+   хранится только на бэкенде и никогда не попадает в статический фронтенд.
+3. Задайте публичный URL сайта: **Bot Settings → Menu Button → Edit menu button
+   URL** → `https://kael-ai.ct.ws`. Кнопка меню открывает KAEL как Mini App.
+4. Username бота (без `@`) пропишите во фронтенде как
+   `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` — он нужен для кнопки «Открыть в
+   Telegram» на экране блокировки.
+
+Telegram открывает Mini App только по HTTPS, поэтому домен должен быть уже
+доступен по `https://` до настройки кнопки меню.
+
+#### Переменные
+
+На Render (backend):
+
+| Переменная | Обязательна | Назначение |
+| --- | --- | --- |
+| `TELEGRAM_BOT_TOKEN` | да | токен из @BotFather |
+| `KAEL_JWT_SECRET` | да | подпись сессионных токенов, длинная случайная строка |
+| `KAEL_ALLOWED_TG_IDS` | нет | ID через запятую для закрытой беты; пусто = все |
+
+Во фронтенде (`.env.production`, на этапе сборки):
+
+```dotenv
+NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=your_bot_username
+```
+
+Важно: сначала задайте `TELEGRAM_BOT_TOKEN` и `KAEL_JWT_SECRET` на Render и
+только потом деплойте код с защитой `/api/chat`. Если выложить код раньше,
+вход через Telegram вернёт 500, а обычный браузер останется на экране
+блокировки.
+
+Сессионный токен — не стандартный JWT, а payload в base64url плюс HMAC-SHA256.
+Он проверяется на каждом запросе; allowlist тоже перечитывается каждый раз,
+поэтому удаление ID из `KAEL_ALLOWED_TG_IDS` отзывает доступ сразу, не дожидаясь
+истечения 7 дней.
 
 ---
 
@@ -386,10 +450,17 @@ npm run preview
 - [ ] `KAEL_ALLOWED_ORIGINS` содержит точный HTTPS-адрес InfinityFree.
 - [ ] `KAEL_DEV_SECRET` заменён на сильный секрет.
 - [ ] `OPENROUTER_API_KEY` (и/или `GROQ_API_KEY`) задан в панели хостинга.
+- [ ] `TELEGRAM_BOT_TOKEN` задан на Render.
+- [ ] `KAEL_JWT_SECRET` задан на Render (длинная случайная строка).
+- [ ] При закрытой бете `KAEL_ALLOWED_TG_IDS` содержит нужные Telegram ID.
 - [ ] `frontend/.env.production` содержит публичный URL бэкенда.
+- [ ] `frontend/.env.production` содержит `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME`.
 - [ ] `.env.local` / `.env.production.local` не перекрывают production-URL при сборке.
 - [ ] `npm run build` завершился успешно, `out/index.html` существует.
 - [ ] В `out/_next/static/chunks/app/*.js` нет `localhost`/`192.168.*`.
 - [ ] Содержимое `out/` загружено в `htdocs`, `.htaccess` на месте.
 - [ ] HTTPS включён, сайт открывается по `https://`.
+- [ ] Кнопка меню в @BotFather ведёт на `https://kael-ai.ct.ws`.
+- [ ] Вход через Telegram открывает приложение, тур и чат работают.
+- [ ] Обычный браузер показывает экран «Доступ только через Telegram Mini App».
 - [ ] Артефакты и превью работают на публичном домене.

@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Manrope, Unbounded } from "next/font/google";
+import { TelegramAuthProvider } from "../components/TelegramAuthProvider";
 import { LanguageProvider } from "../lib/i18n";
 import "./globals.css";
+import "./kael-auth.css";
 
 const displayFont = Unbounded({
   subsets: ["cyrillic", "latin"],
@@ -24,6 +27,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
   themeColor: "#050507",
   colorScheme: "dark",
 };
@@ -36,7 +40,15 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className={`${displayFont.variable} ${interfaceFont.variable}`}>
-        <LanguageProvider>{children}</LanguageProvider>
+        {/* beforeInteractive guarantees window.Telegram exists before the
+            auth provider runs. */}
+        <Script
+          src="https://telegram.org/js/telegram-web-app.js"
+          strategy="beforeInteractive"
+        />
+        <LanguageProvider>
+          <TelegramAuthProvider>{children}</TelegramAuthProvider>
+        </LanguageProvider>
       </body>
     </html>
   );

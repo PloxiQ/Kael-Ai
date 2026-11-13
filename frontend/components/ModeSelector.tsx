@@ -162,6 +162,7 @@ export default function ModeSelector({
         type="button"
         onClick={() => setOpen((current) => !current)}
         disabled={disabled}
+        data-tour="mode"
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}

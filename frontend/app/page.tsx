@@ -30,6 +30,8 @@ import Sidebar, { type SidebarSession } from "../components/Sidebar";
 import StreamingMessage from "../components/StreamingMessage";
 import ThinkingStatus from "../components/ThinkingStatus";
 import TiersModal from "../components/TiersModal";
+import { UserChip } from "../components/UserChip";
+import { authFetch } from "../lib/api";
 import {
   MAX_ATTACHMENTS,
   MAX_TOTAL_ATTACHMENT_BYTES,
@@ -1183,10 +1185,9 @@ export default function ChatPage() {
     );
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/chat`, {
+      const response = await authFetch("/api/chat", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           ...(devBypass ? { "X-Developer-Secret": DEV_SECRET } : {}),
         },
         body: JSON.stringify({
@@ -1413,6 +1414,8 @@ export default function ChatPage() {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
+              <UserChip compact />
+
               <LanguageSelector />
 
               <button

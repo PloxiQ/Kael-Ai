@@ -330,6 +330,7 @@ export default function Composer({
           }}
           rows={1}
           maxLength={MAX_MESSAGE_LENGTH}
+          data-tour="input"
           placeholder={t("composer.placeholder")}
           aria-label={t("composer.messageAria")}
           className="max-h-[220px] min-h-[64px] w-full resize-none bg-transparent px-5 pb-1 pt-5 text-base leading-8 text-zinc-100 outline-none placeholder:text-zinc-600 sm:px-6"
@@ -341,6 +342,7 @@ export default function Composer({
               type="button"
               onClick={() => documentInputRef.current?.click()}
               disabled={isThinking}
+              data-tour="attach"
               aria-label={t("attachment.attachFile")}
               title={t("attachment.attachHint")}
               className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-zinc-400 transition hover:bg-white/[0.06] hover:text-zinc-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5576c]/35"
@@ -383,6 +385,7 @@ export default function Composer({
             <button
               type="submit"
               disabled={!canSubmit}
+              data-tour="send"
               aria-label={
                 isThinking
                   ? t("composer.generating")

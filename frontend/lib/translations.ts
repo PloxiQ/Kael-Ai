@@ -52,6 +52,36 @@ const ru = {
   "language.label": "Язык",
   "language.select": "Выбрать язык",
 
+  "auth.loading": "Подключение к KAEL…",
+  "auth.slow": "Сервер просыпается, это может занять до минуты.",
+  "auth.telegramOnly":
+    "Доступ к KAEL AI открыт только через Telegram Mini App",
+  "auth.openTelegram": "Открыть в Telegram",
+  "auth.botHint": "Открой KAEL через Telegram-бота.",
+  "auth.retry": "Повторить",
+  "auth.checkAgain": "Проверить снова",
+  "auth.connectError": "Не удалось подключиться к серверу",
+  "auth.betaClosed": "Закрытая бета",
+
+  "tour.newChat.title": "Новый чат",
+  "tour.newChat.text": "Жми сюда, чтобы начать свежий диалог с KAEL.",
+  "tour.mode.title": "Режим ответа",
+  "tour.mode.text":
+    "Быстрый, сбалансированный или глубокий. Выбирай под задачу.",
+  "tour.model.title": "Модель",
+  "tour.model.text":
+    "Здесь переключается ИИ-модель. Можно сравнить ответы.",
+  "tour.attach.title": "Файлы",
+  "tour.attach.text":
+    "Скрепка: прикрепи файл или картинку к сообщению.",
+  "tour.input.title": "Сообщение",
+  "tour.input.text": "Пиши вопрос сюда. Enter отправляет.",
+  "tour.send.title": "Отправка",
+  "tour.send.text": "Или тапни стрелку. Поехали!",
+  "tour.skip": "Пропустить",
+  "tour.next": "Дальше",
+  "tour.done": "Готово",
+
   "landing.badge": "Прямой диалог",
   "landing.title1": "Думай точнее.",
   "landing.title2": "Делай меньше шума.",
@@ -314,6 +344,36 @@ const uk: Record<TranslationKey, string> = {
   "language.label": "Мова",
   "language.select": "Обрати мову",
 
+  "auth.loading": "Підключення до KAEL…",
+  "auth.slow": "Сервер прокидається, це може зайняти до хвилини.",
+  "auth.telegramOnly":
+    "Доступ до KAEL AI відкритий лише через Telegram Mini App",
+  "auth.openTelegram": "Відкрити в Telegram",
+  "auth.botHint": "Відкрий KAEL через Telegram-бота.",
+  "auth.retry": "Повторити",
+  "auth.checkAgain": "Перевірити ще раз",
+  "auth.connectError": "Не вдалося підключитися до сервера",
+  "auth.betaClosed": "Закрита бета",
+
+  "tour.newChat.title": "Новий чат",
+  "tour.newChat.text": "Тисни сюди, щоб почати свіжий діалог з KAEL.",
+  "tour.mode.title": "Режим відповіді",
+  "tour.mode.text":
+    "Швидкий, збалансований або глибокий. Обирай під задачу.",
+  "tour.model.title": "Модель",
+  "tour.model.text":
+    "Тут перемикається ШІ-модель. Можна порівняти відповіді.",
+  "tour.attach.title": "Файли",
+  "tour.attach.text":
+    "Скрепка: прикріпи файл або зображення до повідомлення.",
+  "tour.input.title": "Повідомлення",
+  "tour.input.text": "Пиши питання сюди. Enter надсилає.",
+  "tour.send.title": "Надсилання",
+  "tour.send.text": "Або тапни стрілку. Поїхали!",
+  "tour.skip": "Пропустити",
+  "tour.next": "Далі",
+  "tour.done": "Готово",
+
   "landing.badge": "Прямий діалог",
   "landing.title1": "Думай точніше.",
   "landing.title2": "Роби менше шуму.",
@@ -572,6 +632,36 @@ const en: Record<TranslationKey, string> = {
 
   "language.label": "Language",
   "language.select": "Choose language",
+
+  "auth.loading": "Connecting to KAEL…",
+  "auth.slow": "The server is waking up. This can take up to a minute.",
+  "auth.telegramOnly":
+    "KAEL AI is available only through the Telegram Mini App",
+  "auth.openTelegram": "Open in Telegram",
+  "auth.botHint": "Open KAEL through the Telegram bot.",
+  "auth.retry": "Try again",
+  "auth.checkAgain": "Check again",
+  "auth.connectError": "Could not connect to the server",
+  "auth.betaClosed": "Closed beta",
+
+  "tour.newChat.title": "New chat",
+  "tour.newChat.text": "Tap here to start a fresh conversation with KAEL.",
+  "tour.mode.title": "Response mode",
+  "tour.mode.text":
+    "Fast, balanced, or deep. Pick the one that fits the task.",
+  "tour.model.title": "Model",
+  "tour.model.text":
+    "Switch the AI model here. You can compare answers.",
+  "tour.attach.title": "Files",
+  "tour.attach.text":
+    "The paperclip attaches a file or image to your message.",
+  "tour.input.title": "Message",
+  "tour.input.text": "Type your question here. Enter sends it.",
+  "tour.send.title": "Send",
+  "tour.send.text": "Or tap the arrow. Let's go!",
+  "tour.skip": "Skip",
+  "tour.next": "Next",
+  "tour.done": "Done",
 
   "landing.badge": "Direct dialogue",
   "landing.title1": "Think sharper.",
