@@ -99,8 +99,8 @@ SUPPORTED_MODELS: dict[ProviderName, tuple[str, ...]] = {
         "deepseek/deepseek-chat",
     ),
     "groq": (
-        "llama-3.3-70b-versatile",
-        "mixtral-8x7b-32768",
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
     ),
     "ollama": (
         "llama3",

@@ -52,16 +52,16 @@ export const MODEL_GROUPS: ModelGroup[] = [
     hint: "быстро",
     models: [
       {
-        id: "groq/llama-3.3-70b-versatile",
+        id: "groq/openai/gpt-oss-120b",
         provider: "groq",
-        name: "Llama 3.3 70B",
-        description: "Почти мгновенный ответ через Groq",
+        name: "GPT-OSS 120B",
+        description: "Мощная модель с почти мгновенным ответом",
       },
       {
-        id: "groq/mixtral-8x7b-32768",
+        id: "groq/openai/gpt-oss-20b",
         provider: "groq",
-        name: "Mixtral 8x7B",
-        description: "Компактная модель для коротких задач",
+        name: "GPT-OSS 20B",
+        description: "Самая быстрая для коротких задач",
       },
     ],
   },
@@ -94,7 +94,7 @@ export const ALL_MODELS: ModelOption[] = MODEL_GROUPS.flatMap(
 
 export const DEFAULT_MODEL_BY_PROVIDER: Record<ProviderId, string> = {
   openrouter: DEFAULT_MODEL_ID,
-  groq: "groq/llama-3.3-70b-versatile",
+  groq: "groq/openai/gpt-oss-120b",
   ollama: "ollama/llama3",
 };
 

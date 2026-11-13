@@ -165,8 +165,8 @@ const ru = {
   "model.desc.gpt4o": "Больше глубины на сложных запросах",
   "model.desc.claude": "Сильный в коде и длинном контексте",
   "model.desc.deepseek": "Спокойные рассуждения без лишнего шума",
-  "model.desc.llama33": "Почти мгновенный ответ через Groq",
-  "model.desc.mixtral": "Компактная модель для коротких задач",
+  "model.desc.gptOss120b": "Мощная модель с почти мгновенным ответом",
+  "model.desc.gptOss20b": "Самая быстрая для коротких задач",
   "model.desc.llama3": "Работает на вашем компьютере",
   "model.desc.mistral": "Лёгкая локальная модель для черновиков",
 
@@ -421,8 +421,8 @@ const uk: Record<TranslationKey, string> = {
   "model.desc.gpt4o": "Більше глибини на складних запитах",
   "model.desc.claude": "Сильний у коді та довгому контексті",
   "model.desc.deepseek": "Спокійні міркування без зайвого шуму",
-  "model.desc.llama33": "Майже миттєва відповідь через Groq",
-  "model.desc.mixtral": "Компактна модель для коротких завдань",
+  "model.desc.gptOss120b": "Потужна модель з майже миттєвою відповіддю",
+  "model.desc.gptOss20b": "Найшвидша для коротких завдань",
   "model.desc.llama3": "Працює на вашому комп'ютері",
   "model.desc.mistral": "Легка локальна модель для чернеток",
 
@@ -670,8 +670,8 @@ const en: Record<TranslationKey, string> = {
   "model.desc.gpt4o": "More depth on complex requests",
   "model.desc.claude": "Strong at code and long context",
   "model.desc.deepseek": "Calm reasoning without extra noise",
-  "model.desc.llama33": "Nearly instant answers through Groq",
-  "model.desc.mixtral": "Compact model for short tasks",
+  "model.desc.gptOss120b": "Powerful model with near-instant answers",
+  "model.desc.gptOss20b": "Fastest for short tasks",
   "model.desc.llama3": "Runs on your own computer",
   "model.desc.mistral": "Light local model for drafts",
 
@@ -827,8 +827,8 @@ export const MODEL_DESCRIPTION_KEYS: Record<string, TranslationKey> = {
   "openai/gpt-4o": "model.desc.gpt4o",
   "anthropic/claude-3.5-sonnet": "model.desc.claude",
   "deepseek/deepseek-chat": "model.desc.deepseek",
-  "groq/llama-3.3-70b-versatile": "model.desc.llama33",
-  "groq/mixtral-8x7b-32768": "model.desc.mixtral",
+  "groq/openai/gpt-oss-120b": "model.desc.gptOss120b",
+  "groq/openai/gpt-oss-20b": "model.desc.gptOss20b",
   "ollama/llama3": "model.desc.llama3",
   "ollama/mistral": "model.desc.mistral",
 };
