@@ -74,7 +74,7 @@ const ru = {
     "Объясни, как устроена память в больших языковых моделях, простыми словами. Покажи, где обычно ошибаются.",
   "starter.code.title": "Спроектировать код",
   "starter.code.description":
-    "Получить минимальную реализацию и разбор решений.",
+    "Минимальная реализация и разбор решений.",
   "starter.code.prompt":
     "Напиши минимальную реализацию очереди задач на TypeScript. Объясни ключевые решения и назови крайние случаи.",
   "starter.compare.title": "Сравнить подходы",
@@ -336,7 +336,7 @@ const uk: Record<TranslationKey, string> = {
     "Поясни, як влаштована пам'ять у великих мовних моделях, простими словами. Покажи, де зазвичай помиляються.",
   "starter.code.title": "Спроєктувати код",
   "starter.code.description":
-    "Отримати мінімальну реалізацію та розбір рішень.",
+    "Мінімальна реалізація та розбір рішень.",
   "starter.code.prompt":
     "Напиши мінімальну реалізацію черги завдань на TypeScript. Поясни ключові рішення та назви крайні випадки.",
   "starter.compare.title": "Порівняти підходи",
@@ -595,7 +595,7 @@ const en: Record<TranslationKey, string> = {
     "Explain how memory works in large language models in plain words. Point out where people usually get it wrong.",
   "starter.code.title": "Design code",
   "starter.code.description":
-    "Get a minimal implementation and the reasoning behind it.",
+    "Minimal implementation and a walkthrough.",
   "starter.code.prompt":
     "Write a minimal task queue implementation in TypeScript. Explain the key decisions and name the edge cases.",
   "starter.compare.title": "Compare approaches",

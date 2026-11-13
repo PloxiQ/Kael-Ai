@@ -306,9 +306,9 @@ function LandingState({
   const { t } = useI18n();
 
   return (
-    <section className="flex min-h-0 flex-1 overflow-y-auto px-4 py-8 sm:px-6 sm:py-10">
+    <section className="flex min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
       <div className="mx-auto my-auto w-full max-w-4xl">
-        <div className="mb-6 flex items-center gap-3">
+        <div className="mb-5 flex items-center gap-3">
           <span className="h-px w-8 bg-kael-gradient" />
           <span className="kael-display text-sm font-medium uppercase tracking-[0.14em] text-[#f7a6ba]">
             {t("landing.badge")}
@@ -322,18 +322,18 @@ function LandingState({
           <span className="kael-gradient-text">{t("landing.title2")}</span>
         </h1>
 
-        <p className="mt-6 max-w-xl text-base leading-8 text-zinc-400">
+        <p className="mt-5 max-w-xl text-base leading-8 text-zinc-400">
           {t("landing.description")}
         </p>
 
-        <div className="mt-9 grid gap-3 sm:grid-cols-2">
+        <div className="mt-7 grid gap-2.5 sm:grid-cols-2">
           {PROMPT_STARTERS.map((starter, index) => (
             <button
               key={starter.title}
               type="button"
               onClick={() => onPrompt(t(starter.prompt))}
               disabled={disabled}
-              className="group rounded-2xl border border-white/[0.08] bg-[#07070a]/70 p-5 text-left backdrop-blur-2xl transition hover:border-[#f093fb]/30 hover:bg-[#0d0d12]/80 hover:shadow-[0_24px_60px_-34px_rgba(245,87,108,0.6)] disabled:cursor-not-allowed disabled:opacity-50"
+              className="group rounded-2xl border border-white/[0.08] bg-[#07070a]/70 p-4 text-left backdrop-blur-2xl transition hover:border-[#f093fb]/30 hover:bg-[#0d0d12]/80 hover:shadow-[0_24px_60px_-34px_rgba(245,87,108,0.6)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -357,7 +357,7 @@ function LandingState({
           ))}
         </div>
 
-        <div className="mt-7 border-t border-white/[0.07] pt-5">
+        <div className="mt-6 border-t border-white/[0.07] pt-4">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <span className="kael-display text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">
               {t("capabilities.title")}
