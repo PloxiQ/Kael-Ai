@@ -92,6 +92,7 @@ type ChatMessage = {
   userMessage?: string;
   durationMs?: number;
   mode?: ResponseMode;
+  reasoning?: string;
   attachments?: Attachment[];
 };
 
@@ -104,6 +105,7 @@ type ChatApiResponse = {
   detail?: string;
   latency_ms?: number;
   tokens_used?: number;
+  reasoning?: string | null;
 };
 
 type PromptStarter = {
@@ -192,6 +194,10 @@ function isChatMessage(value: unknown): value is ChatMessage {
   }
 
   if (message.mode !== undefined && !isResponseMode(message.mode)) {
+    return false;
+  }
+
+  if (message.reasoning !== undefined && typeof message.reasoning !== "string") {
     return false;
   }
 
@@ -534,6 +540,7 @@ function ChatMessageRow({
             userMessage={message.userMessage}
             durationMs={message.durationMs}
             mode={message.mode}
+            reasoning={message.reasoning}
           />
         </div>
       )}
@@ -1249,6 +1256,10 @@ export default function ChatPage() {
           userMessage: effectiveText,
           durationMs: data?.latency_ms ?? clientDurationMs,
           mode: selectedMode,
+          reasoning:
+            typeof data?.reasoning === "string" && data.reasoning.trim()
+              ? data.reasoning
+              : undefined,
         },
       ]);
       setStreamingId(assistantMessageId);

@@ -124,6 +124,32 @@ VISION_MODELS = {
     "anthropic/claude-3.5-sonnet",
 }
 
+# Models that expose their chain of thought (Groq gpt-oss, OpenRouter reasoning
+# models, Ollama "thinking" models) return it next to the answer. It is capped
+# so a runaway trace cannot bloat the JSON response or the browser's storage.
+MAX_REASONING_CHARS = 20_000
+GROQ_REASONING_EFFORT: dict[str, str] = {
+    "fast": "low",
+    "balanced": "medium",
+    "deep": "high",
+}
+
+
+def _clean_reasoning(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    text = value.strip()
+    return text[:MAX_REASONING_CHARS] if text else ""
+
+
+def _extract_reasoning(message: object) -> str:
+    """Read the model's reasoning from an OpenAI-compatible message object."""
+    for field in ("reasoning", "reasoning_content"):
+        text = _clean_reasoning(getattr(message, field, None))
+        if text:
+            return text
+    return ""
+
 
 def _env_int(name: str, default: int) -> int:
     raw_value = os.getenv(name)
@@ -258,6 +284,7 @@ class ChatResponse(BaseModel):
     tokens_used: int
     dev_mode: bool = False
     attachments_used: int = 0
+    reasoning: str | None = None
 
 
 DEFAULT_ALLOWED_ORIGINS = (
@@ -583,7 +610,8 @@ def _request_openai_compatible(
     timeout: float,
     dev_mode: bool,
     default_headers: dict[str, str] | None = None,
-) -> tuple[str, int]:
+    reasoning_effort: str | None = None,
+) -> tuple[str, int, str]:
     label = PROVIDER_LABELS[provider]
     client = OpenAI(
         api_key=api_key,
@@ -592,6 +620,9 @@ def _request_openai_compatible(
         default_headers=default_headers,
     )
     max_tokens = DEV_MAX_TOKENS if dev_mode else MODE_MAX_TOKENS[mode]
+    extra_params: dict[str, str] = {}
+    if reasoning_effort:
+        extra_params["reasoning_effort"] = reasoning_effort
 
     try:
         completion = client.chat.completions.create(
@@ -602,6 +633,7 @@ def _request_openai_compatible(
             ],
             temperature=MODE_TEMPERATURE[mode],
             max_tokens=max_tokens,
+            **extra_params,
         )
     except APITimeoutError as error:
         raise HTTPException(
@@ -662,7 +694,9 @@ def _request_openai_compatible(
         )
     )
 
-    return reply.strip(), tokens_used
+    return reply.strip(), tokens_used, _extract_reasoning(
+        completion.choices[0].message
+    )
 
 
 def request_openrouter(
@@ -671,7 +705,7 @@ def request_openrouter(
     mode: ResponseMode,
     language: Language,
     dev_mode: bool,
-) -> tuple[str, int]:
+) -> tuple[str, int, str]:
     api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if not api_key:
         raise HTTPException(
@@ -709,7 +743,7 @@ def request_groq(
     mode: ResponseMode,
     language: Language,
     dev_mode: bool,
-) -> tuple[str, int]:
+) -> tuple[str, int, str]:
     api_key = os.getenv("GROQ_API_KEY", "").strip()
     if not api_key:
         raise HTTPException(
@@ -732,6 +766,9 @@ def request_groq(
             "GROQ_BASE_URL", "https://api.groq.com/openai/v1"
         ).rstrip("/"),
         timeout=_env_float("GROQ_TIMEOUT_SECONDS", 60.0),
+        reasoning_effort=(
+            GROQ_REASONING_EFFORT[mode] if "gpt-oss" in model else None
+        ),
     )
 
 
@@ -741,7 +778,7 @@ def request_ollama(
     mode: ResponseMode,
     language: Language,
     dev_mode: bool,
-) -> tuple[str, int]:
+) -> tuple[str, int, str]:
     base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip(
         "/"
     )
@@ -851,7 +888,11 @@ def request_ollama(
         else _estimate_tokens(_system_prompt(mode, language), content, reply)
     )
 
-    return reply.strip(), tokens_used
+    thinking = _clean_reasoning(
+        message_data.get("thinking") if isinstance(message_data, dict) else None
+    )
+
+    return reply.strip(), tokens_used, thinking
 
 
 @app.get("/health")
@@ -913,7 +954,7 @@ def chat(
         content = _build_user_content(
             message, attachment_text, image_urls, supports_vision
         )
-        reply, tokens_used = request_openrouter(
+        reply, tokens_used, reasoning = request_openrouter(
             content, model, mode, request.language, request.dev_mode
         )
     else:
@@ -921,11 +962,11 @@ def chat(
             message, attachment_text, image_urls, False
         )
         if provider == "groq":
-            reply, tokens_used = request_groq(
+            reply, tokens_used, reasoning = request_groq(
                 text_content, model, mode, request.language, request.dev_mode
             )
         else:
-            reply, tokens_used = request_ollama(
+            reply, tokens_used, reasoning = request_ollama(
                 text_content, model, mode, request.language, request.dev_mode
             )
 
@@ -940,4 +981,5 @@ def chat(
         tokens_used=tokens_used,
         dev_mode=request.dev_mode,
         attachments_used=len(request.attachments),
+        reasoning=reasoning or None,
     )

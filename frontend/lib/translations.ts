@@ -214,6 +214,9 @@ const ru = {
   "thinking.processing": "Обрабатываю запрос...",
   "thinking.done": "Готово",
   "thinking.doneIn": "Готово за {seconds} с",
+  "thinking.reasoning": "Мысли модели",
+  "thinking.noReasoning":
+    "Эта модель не передала ход рассуждений. Показаны примерные этапы обработки.",
   "thinking.short": "Собираю короткий ответ без длинных рассуждений...",
   "thinking.deepExtra0": "Проверяю архитектуру и скрытые ограничения...",
   "thinking.deepExtra1":
@@ -511,6 +514,9 @@ const uk: Record<TranslationKey, string> = {
   "thinking.processing": "Обробляю запит...",
   "thinking.done": "Готово",
   "thinking.doneIn": "Готово за {seconds} с",
+  "thinking.reasoning": "Думки моделі",
+  "thinking.noReasoning":
+    "Ця модель не передала хід міркувань. Показано приблизні етапи обробки.",
   "thinking.short": "Збираю коротку відповідь без довгих міркувань...",
   "thinking.deepExtra0":
     "Перевіряю архітектуру та приховані обмеження...",
@@ -801,6 +807,9 @@ const en: Record<TranslationKey, string> = {
   "thinking.processing": "Processing the request...",
   "thinking.done": "Ready",
   "thinking.doneIn": "Ready in {seconds}s",
+  "thinking.reasoning": "Model reasoning",
+  "thinking.noReasoning":
+    "This model did not return its reasoning. Showing approximate processing steps.",
   "thinking.short": "Assembling a short answer without long reasoning...",
   "thinking.deepExtra0":
     "Checking the architecture and hidden constraints...",

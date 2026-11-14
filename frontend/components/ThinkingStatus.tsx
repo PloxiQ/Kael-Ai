@@ -23,6 +23,8 @@ export type ThinkingStatusProps = {
   /** Total time of the finished answer, shown in the finished state. */
   durationMs?: number;
   mode?: ResponseMode;
+  /** The model's own chain of thought. When present, the finished state shows it instead of generic steps. */
+  reasoning?: string;
   /** Custom rotating statuses, e.g. ["Думает...", "Анализирует код..."]. Overrides the generated ones. */
   statuses?: string[];
   /** Fully controlled label. When set, the internal timer does not rotate statuses. */
@@ -299,6 +301,9 @@ const STYLES = `
 .kts-shimmer{background:linear-gradient(100deg,#8E8E8A 38%,#D1FAE5 50%,#8E8E8A 62%) 100% 0/250% 100% no-repeat;-webkit-background-clip:text;background-clip:text;color:transparent;animation:kts-shine 2.6s linear infinite}
 .kts-comet{position:absolute;left:0;right:0;bottom:0;height:1px;overflow:hidden;pointer-events:none}
 .kts-comet::after{content:"";position:absolute;top:0;bottom:0;left:0;width:34%;background:linear-gradient(90deg,transparent,#10B981,transparent);animation:kts-comet 2s cubic-bezier(.45,0,.25,1) infinite}
+.kts-reasoning{scrollbar-width:thin;scrollbar-color:#262626 transparent}
+.kts-reasoning::-webkit-scrollbar{width:6px}
+.kts-reasoning::-webkit-scrollbar-thumb{background:#262626;border-radius:9999px}
 .kts-ping{position:relative}
 .kts-ping::after{content:"";position:absolute;inset:-3px;border-radius:9999px;border:1px solid #10B981;animation:kts-ping 1.4s ease-out infinite}
 @keyframes kts-wave{0%,60%,100%{background:#262626;transform:scale(.7);box-shadow:none}30%{background:#10B981;transform:scale(1.15);box-shadow:0 0 9px rgba(16,185,129,.7)}}
@@ -414,6 +419,7 @@ export default function ThinkingStatus({
   userMessage = "",
   durationMs,
   mode = "balanced",
+  reasoning,
   statuses,
   status,
   intervalMs,
@@ -494,6 +500,8 @@ export default function ThinkingStatus({
       ? t("thinking.doneIn", { seconds: (durationMs / 1000).toFixed(1) })
       : t("thinking.done");
   const summary = isThinking ? activeLabel : finishedLabel;
+  const reasoningText = reasoning?.trim() ?? "";
+  const showReasoning = !isThinking && reasoningText.length > 0;
 
   return (
     <div
@@ -516,7 +524,7 @@ export default function ThinkingStatus({
         {isThinking ? <Lattice key="busy" /> : <DoneMark key="done" />}
         <StatusText text={summary} shimmer={isThinking} />
         {isThinking && showTimer && (
-          <span className="shrink-0 font-mono text-[11px] tabular-nums text-[#8E8E8A]/60">
+          <span className="shrink-0 font-[family-name:ui-monospace,SFMono-Regular,Consolas,monospace] text-[11px] tabular-nums text-[#8E8E8A]/60">
             {formatClock(elapsed)}
           </span>
         )}
@@ -535,12 +543,37 @@ export default function ThinkingStatus({
       {!hideSteps && (
         <div
           aria-hidden={!expanded}
+          inert={!expanded}
           className={`grid transition-[grid-template-rows] duration-300 ease-out ${
             expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
           }`}
         >
           <div className="min-h-0 overflow-hidden">
-            <ol className="space-y-0.5 border-t border-[#262626] px-3.5 py-3">
+            {showReasoning ? (
+              <div className="border-t border-[#262626] px-3.5 py-3">
+                <div className="mb-2.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8E8E8A]/70">
+                  <span className="h-px w-3 bg-[#10B981]" />
+                  {t("thinking.reasoning")}
+                </div>
+                <div
+                  tabIndex={0}
+                  className="kts-reasoning max-h-72 overflow-y-auto whitespace-pre-wrap break-words border-l border-[#10B981]/40 pl-3 pr-1 font-[family-name:ui-monospace,SFMono-Regular,Consolas,monospace] text-[12.5px] leading-6 text-[#8E8E8A] outline-none focus-visible:ring-1 focus-visible:ring-[#10B981]/50"
+                >
+                  {reasoningText}
+                </div>
+              </div>
+            ) : (
+              <>
+                {!isThinking && (
+                  <p className="border-t border-[#262626] px-3.5 pt-3 text-xs leading-5 text-[#8E8E8A]/60">
+                    {t("thinking.noReasoning")}
+                  </p>
+                )}
+            <ol
+              className={`space-y-0.5 px-3.5 py-3 ${
+                isThinking ? "border-t border-[#262626]" : ""
+              }`}
+            >
               {labels.map((label, index) => {
                 const done = !isThinking || index < currentIndex;
                 const current = isThinking && index === currentIndex;
@@ -564,6 +597,8 @@ export default function ThinkingStatus({
                 );
               })}
             </ol>
+              </>
+            )}
           </div>
         </div>
       )}
