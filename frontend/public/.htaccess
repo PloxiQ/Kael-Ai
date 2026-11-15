@@ -17,17 +17,8 @@ Options -Indexes
   RewriteCond %{HTTPS} !=on
   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-  # Serve real files and directories as-is.
-  RewriteCond %{REQUEST_FILENAME} -f [OR]
-  RewriteCond %{REQUEST_FILENAME} -d
-  RewriteRule ^ - [L]
-
-  # Never rewrite a missing build asset to index.html.
-  RewriteCond %{REQUEST_URI} ^/_next/ [NC]
-  RewriteRule ^ - [L]
-
-  # Client-side fallback for the single-page app.
-  RewriteRule ^ index.html [L]
+  # Every route is a real directory in the static export, so unknown paths
+  # must fall through to ErrorDocument 404 instead of a soft 200.
 </IfModule>
 
 <IfModule mod_headers.c>
