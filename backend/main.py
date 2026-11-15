@@ -438,11 +438,17 @@ ALLOWED_ORIGIN_REGEX = (
     os.getenv("KAEL_ALLOWED_ORIGIN_REGEX", "").strip() or None
 )
 MAX_REQUEST_BYTES = _env_int("KAEL_MAX_REQUEST_BYTES", 25_000_000)
+IS_PRODUCTION = os.getenv("KAEL_ENV", "").strip().lower() == "production"
 
 app = FastAPI(
     title="KAEL API",
     description="Multi-provider FastAPI backend for KAEL.",
     version="1.1.0",
+    # The generated schema is a full route inventory. It is handy locally and
+    # pointless in production, where the frontend never reads it.
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
 )
 app.add_middleware(
     CORSMiddleware,
