@@ -3,9 +3,10 @@ const nextConfig = {
   reactStrictMode: true,
   devIndicators: false,
 
-  // Lets a phone on the same Wi-Fi open the dev server without Next.js
-  // blocking its /_next/* requests. Production export ignores this.
-  allowedDevOrigins: ["192.168.31.*"],
+  // Lets a phone on the same Wi-Fi and the 127.0.0.1 test origin open the
+  // dev server without Next.js blocking their /_next/* requests. Production
+  // export ignores this.
+  allowedDevOrigins: ["192.168.31.*", "127.0.0.1", "localhost"],
 
   // InfinityFree serves plain static files, so the frontend is exported
   // as a fully client-rendered bundle into `out/` by `npm run build`.

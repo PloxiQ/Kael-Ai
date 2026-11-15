@@ -83,7 +83,7 @@ export default function Sidebar({
   const renderPanel = (isCollapsed: boolean) => (
     <>
       <div
-        className={`flex h-16 shrink-0 items-center border-b border-white/[0.06] sm:h-[72px] ${
+        className={`flex h-16 shrink-0 items-center border-b border-[#262626] sm:h-[72px] ${
           isCollapsed ? "justify-center px-2" : "justify-between px-5"
         }`}
       >
@@ -98,7 +98,7 @@ export default function Sidebar({
           aria-label={
             isCollapsed ? t("sidebar.expand") : t("sidebar.collapse")
           }
-          className="hidden rounded-lg p-2.5 text-zinc-500 transition hover:bg-white/[0.05] hover:text-zinc-100 lg:inline-flex"
+          className="hidden rounded-lg p-2.5 text-zinc-500 transition hover:bg-[#1C1C1C] hover:text-zinc-100 lg:inline-flex"
         >
           {isCollapsed ? (
             <PanelLeftOpen size={18} strokeWidth={1.5} />
@@ -110,7 +110,7 @@ export default function Sidebar({
           type="button"
           onClick={onMobileClose}
           aria-label={t("sidebar.closeMenu")}
-          className="rounded-lg p-2.5 text-zinc-500 transition hover:bg-white/[0.05] hover:text-zinc-100 lg:hidden"
+          className="rounded-lg p-2.5 text-zinc-500 transition hover:bg-[#1C1C1C] hover:text-zinc-100 lg:hidden"
         >
           <X size={18} strokeWidth={1.5} />
         </button>
@@ -123,7 +123,7 @@ export default function Sidebar({
           disabled={busy}
           data-tour="new-chat"
           title={busy ? t("sidebar.wait") : t("sidebar.newChat")}
-          className={`group flex w-full items-center gap-3 rounded-xl bg-kael-gradient px-4 py-3 text-sm font-semibold text-[#1c0710] shadow-[0_16px_44px_-18px_rgba(245,87,108,0.7)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 ${
+          className={`group flex w-full items-center gap-3 rounded-xl bg-[#10B981] px-4 py-3 text-sm font-semibold text-[#052E1C] shadow-none transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 ${
             isCollapsed ? "justify-center px-0" : ""
           }`}
         >
@@ -154,7 +154,7 @@ export default function Sidebar({
 
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {sessions.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-white/[0.08] px-4 py-5">
+              <div className="rounded-xl border border-dashed border-[#262626] px-4 py-5">
                 <p className="text-sm leading-6 text-zinc-500">
                   {t("sidebar.empty")}
                 </p>
@@ -173,12 +173,12 @@ export default function Sidebar({
                       aria-current={active ? "true" : undefined}
                       className={`relative flex w-full items-center justify-between gap-3 rounded-xl px-3.5 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
                         active
-                          ? "bg-white/[0.06] text-zinc-100"
-                          : "text-zinc-500 hover:bg-white/[0.035] hover:text-zinc-300"
+                          ? "bg-[#1C1C1C] text-zinc-100"
+                          : "text-zinc-500 hover:bg-[#1C1C1C] hover:text-zinc-300"
                       }`}
                     >
                       {active && (
-                        <span className="absolute inset-y-2.5 left-0 w-0.5 rounded-full bg-kael-gradient" />
+                        <span className="absolute inset-y-2.5 left-0 w-0.5 rounded-full bg-[#10B981]" />
                       )}
                       <span className="min-w-0 truncate text-sm">
                         {session.title}
@@ -211,7 +211,7 @@ export default function Sidebar({
                   })
             }
             aria-label={t("sidebar.tierAria")}
-            className="flex w-full items-center justify-center rounded-xl border border-white/[0.08] p-2.5 text-[#f7a6ba] transition hover:border-[#f093fb]/35 hover:bg-white/[0.04]"
+            className="flex w-full items-center justify-center rounded-xl border border-[#262626] p-2.5 text-[#34D399] transition hover:border-[#10B981]/35 hover:bg-[#1C1C1C]"
           >
             <Crown size={18} strokeWidth={1.6} />
           </button>
@@ -220,13 +220,13 @@ export default function Sidebar({
             type="button"
             onClick={onOpenTiers}
             aria-label={t("sidebar.tierAriaName", { tier: tierName })}
-            className="group w-full rounded-xl border border-white/[0.08] bg-[#07070a]/70 p-3.5 text-left backdrop-blur-xl transition hover:border-[#f093fb]/30 hover:bg-white/[0.03]"
+            className="group w-full rounded-xl border border-[#262626] bg-[#161616]/70 p-3.5 text-left backdrop-blur-xl transition hover:border-[#10B981]/30 hover:bg-[#1C1C1C]"
           >
             <div className="flex items-center gap-2.5">
               <Crown
                 size={16}
                 strokeWidth={1.6}
-                className="shrink-0 text-[#f7a6ba]"
+                className="shrink-0 text-[#34D399]"
               />
               <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-200">
                 {tierName}
@@ -238,15 +238,15 @@ export default function Sidebar({
               />
             </div>
 
-            <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.08]">
+            <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-[#1C1C1C]">
               <motion.div
                 initial={false}
                 animate={{
                   width: unlimited ? "100%" : `${Math.max(percent, 2)}%`,
                 }}
                 transition={{ type: "spring", stiffness: 90, damping: 22 }}
-                className={`h-full rounded-full bg-kael-gradient ${
-                  unlimited ? "kael-glow-pulse" : ""
+                className={`h-full rounded-full bg-[#10B981] ${
+                  unlimited ? "kael-pulse" : ""
                 }`}
               />
             </div>
@@ -263,7 +263,7 @@ export default function Sidebar({
       </div>
 
       <div
-        className={`shrink-0 border-t border-white/[0.06] ${
+        className={`shrink-0 border-t border-[#262626] ${
           isCollapsed ? "flex justify-center p-5" : "px-5 py-4"
         }`}
       >
@@ -271,13 +271,13 @@ export default function Sidebar({
           <span
             title={isOnline ? t("sidebar.apiOnline") : t("sidebar.apiOffline")}
             className={`h-2 w-2 rounded-full ${
-              isOnline ? "kael-pulse bg-[#f5576c]" : "bg-zinc-700"
+              isOnline ? "kael-pulse bg-[#10B981]" : "bg-zinc-700"
             }`}
           />
         ) : (
           <div className="flex items-center gap-2.5">
             {isOnline ? (
-              <Wifi size={15} strokeWidth={1.5} className="text-[#f7a6ba]" />
+              <Wifi size={15} strokeWidth={1.5} className="text-[#34D399]" />
             ) : (
               <WifiOff size={15} strokeWidth={1.5} className="text-zinc-600" />
             )}
@@ -290,7 +290,7 @@ export default function Sidebar({
             </span>
             <span
               className={`ml-auto h-1.5 w-1.5 rounded-full ${
-                isOnline ? "kael-pulse bg-[#f5576c]" : "bg-zinc-700"
+                isOnline ? "kael-pulse bg-[#10B981]" : "bg-zinc-700"
               }`}
             />
           </div>
@@ -325,7 +325,7 @@ export default function Sidebar({
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={SPRING}
-            className="fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r border-white/[0.07] bg-[#07070a]/90 backdrop-blur-2xl will-change-transform lg:hidden"
+            className="fixed inset-y-0 left-0 z-40 flex w-[280px] flex-col border-r border-[#262626] bg-[#161616]/90 backdrop-blur-2xl will-change-transform lg:hidden"
           >
             {renderPanel(false)}
           </motion.aside>
@@ -336,7 +336,7 @@ export default function Sidebar({
         initial={false}
         animate={{ width: collapsed ? 76 : 280 }}
         transition={SPRING}
-        className="relative z-10 hidden h-full shrink-0 flex-col overflow-hidden border-r border-white/[0.07] bg-[#07070a]/85 backdrop-blur-2xl will-change-[width] lg:flex"
+        className="relative z-10 hidden h-full shrink-0 flex-col overflow-hidden border-r border-[#262626] bg-[#161616]/85 backdrop-blur-2xl will-change-[width] lg:flex"
       >
         {renderPanel(collapsed)}
       </motion.aside>

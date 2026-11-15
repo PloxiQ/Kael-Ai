@@ -1,4 +1,9 @@
-export type ProviderId = "openrouter" | "groq" | "ollama";
+export type ProviderId =
+  | "openrouter"
+  | "groq"
+  | "ollama"
+  | "zerocat"
+  | "gemini";
 
 export type ModelOption = {
   id: string;
@@ -13,6 +18,14 @@ export type ModelGroup = {
   hint: string;
   models: ModelOption[];
 };
+
+export const PROVIDER_IDS: readonly ProviderId[] = [
+  "openrouter",
+  "groq",
+  "ollama",
+  "zerocat",
+  "gemini",
+];
 
 export const MODEL_GROUPS: ModelGroup[] = [
   {
@@ -84,6 +97,56 @@ export const MODEL_GROUPS: ModelGroup[] = [
       },
     ],
   },
+  {
+    provider: "zerocat",
+    label: "ZeroCat",
+    hint: "мультидоступ",
+    models: [
+      {
+        id: "zerocat/gpt-5.6-sol",
+        provider: "zerocat",
+        name: "GPT-5.6 Sol",
+        description: "Флагман GPT через ZeroCat",
+      },
+      {
+        id: "zerocat/claude-sonnet-5",
+        provider: "zerocat",
+        name: "Claude Sonnet 5",
+        description: "Сильный в коде и длинном контексте",
+      },
+      {
+        id: "zerocat/deepseek-v4.1-flash",
+        provider: "zerocat",
+        name: "DeepSeek V4.1 Flash",
+        description: "Быстрый и недорогой для повседневных задач",
+      },
+      {
+        id: "zerocat/gemini-3.8-flash",
+        provider: "zerocat",
+        name: "Gemini 3.8 Flash",
+        description: "Быстрая мультимодальная модель",
+      },
+    ],
+  },
+  {
+    provider: "gemini",
+    label: "Gemini",
+    hint: "Google",
+    models: [
+      {
+        id: "gemini/gemini-3.6-flash",
+        provider: "gemini",
+        name: "Gemini 3.6 Flash",
+        description: "Быстрая модель Google с поддержкой изображений",
+      },
+      {
+        id: "gemini/gemini-3.1-pro-preview",
+        provider: "gemini",
+        name: "Gemini 3.1 Pro",
+        description: "Глубокие рассуждения и длинный контекст",
+      },
+    ],
+  },
 ];
 
 // Speed is the main wow factor for new users, so Groq GPT-OSS leads by default.
@@ -99,6 +162,8 @@ export const DEFAULT_MODEL_BY_PROVIDER: Record<ProviderId, string> = {
   openrouter: DEFAULT_OPENROUTER_MODEL_ID,
   groq: "groq/openai/gpt-oss-120b",
   ollama: "ollama/llama3",
+  zerocat: "zerocat/gpt-5.6-sol",
+  gemini: "gemini/gemini-3.6-flash",
 };
 
 const MODEL_BY_ID = new Map(
@@ -114,7 +179,13 @@ export function isModelId(value: unknown): value is string {
 }
 
 export function isProviderId(value: unknown): value is ProviderId {
-  return value === "openrouter" || value === "groq" || value === "ollama";
+  return (
+    value === "openrouter" ||
+    value === "groq" ||
+    value === "ollama" ||
+    value === "zerocat" ||
+    value === "gemini"
+  );
 }
 
 export function providerOf(modelId: string): ProviderId {

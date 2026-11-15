@@ -1,8 +1,10 @@
 "use client";
 
-import { useTelegramAuth } from "./TelegramAuthProvider";
+import { useUser } from "@clerk/react";
+import { useI18n } from "../lib/i18n";
+import { useKaelAuth } from "./auth/KaelAuthProvider";
 
-/** Telegram avatar and name. Used in the header and sidebar. */
+/** Clerk avatar and display name. Used in the header. */
 export function UserChip({
   compact = false,
   className = "",
@@ -10,43 +12,49 @@ export function UserChip({
   compact?: boolean;
   className?: string;
 }) {
-  const { user } = useTelegramAuth();
+  const { user } = useUser();
+  const { role } = useKaelAuth();
+  const { t } = useI18n();
+
   if (!user) {
     return null;
   }
 
-  const initial = (user.first_name || "?").slice(0, 1).toUpperCase();
-  const label = user.username ? `@${user.username}` : user.first_name;
+  const label =
+    user.fullName ||
+    user.username ||
+    user.primaryEmailAddress?.emailAddress ||
+    "KAEL";
+  const initial = label.slice(0, 1).toUpperCase();
+  const roleLabel = role === "user" ? null : t(`auth.role.${role}`);
 
   return (
     <div
-      className={`flex items-center gap-2.5 ${className}`}
+      className={`flex min-w-0 items-center gap-2.5 ${className}`}
       title={label}
     >
-      <div className="rounded-full bg-kael-gradient p-[2px] shadow-[0_0_14px_rgba(245,87,108,0.45)]">
-        {user.photo_url ? (
+      <div className="shrink-0 rounded-full ring-1 ring-[#262626]">
+        {user.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={user.photo_url}
+            src={user.imageUrl}
             alt=""
-            className="h-8 w-8 rounded-full bg-black object-cover"
+            className="h-8 w-8 rounded-full bg-[#161616] object-cover"
             referrerPolicy="no-referrer"
           />
         ) : (
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0b0614] text-sm font-bold text-[#f7a6ba]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#161616] text-sm font-semibold text-[#10B981]">
             {initial}
           </div>
         )}
       </div>
       {!compact && (
         <div className="min-w-0 leading-tight">
-          <div className="truncate text-sm font-medium text-zinc-100">
-            {user.first_name}
+          <div className="truncate text-sm font-medium text-[#F5F5F0]">
+            {label}
           </div>
-          {user.username && (
-            <div className="truncate text-xs text-[#f7a6ba]/70">
-              @{user.username}
-            </div>
+          {roleLabel && (
+            <div className="truncate text-xs text-[#8E8E8A]">{roleLabel}</div>
           )}
         </div>
       )}

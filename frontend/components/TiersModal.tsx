@@ -1,18 +1,10 @@
 "use client";
 
-import {
-  ArrowUpRight,
-  Check,
-  Crown,
-  Gauge,
-  KeyRound,
-  Lock,
-  Sparkles,
-  X,
-} from "lucide-react";
+import { Check, Crown, Gauge, KeyRound, Lock, Sparkles, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { KaelRole } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import {
   DEV_TIER,
@@ -22,19 +14,20 @@ import {
   getTier,
   isUnlimitedTier,
   nextResetLabel,
+  tierForRole,
   usagePercent,
-  type TierId,
   type UsageState,
 } from "../lib/tiers";
-import { TIER_TRANSLATION_KEYS } from "../lib/translations";
+import {
+  TIER_TRANSLATION_KEYS,
+  type TranslationKey,
+} from "../lib/translations";
 
 type TiersModalProps = {
   open: boolean;
   usage: UsageState;
-  devMode: boolean;
+  role: KaelRole;
   onClose: () => void;
-  onSelectTier: (tierId: TierId) => void;
-  onUnlockDev: () => void;
 };
 
 const FOCUSABLE_SELECTOR =
@@ -47,34 +40,33 @@ const TIER_ICONS = {
   dev: KeyRound,
 } as const;
 
-const SECRET_CLICKS = 5;
+const ROLE_KEYS: Record<KaelRole, TranslationKey> = {
+  admin: "auth.role.admin",
+  tester: "auth.role.tester",
+  user: "auth.role.user",
+};
 
 export default function TiersModal({
   open,
   usage,
-  devMode,
+  role,
   onClose,
-  onSelectTier,
-  onUnlockDev,
 }: TiersModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const onCloseRef = useRef(onClose);
-  const clicksRef = useRef(0);
-  const clickTimerRef = useRef<number | null>(null);
   const [mounted, setMounted] = useState(open);
-  const [titlePulse, setTitlePulse] = useState(false);
-  const [devNotice, setDevNotice] = useState(false);
   const { locale, t } = useI18n();
 
-  const currentTier = getTier(usage.tierId);
+  const currentTierId = tierForRole(role);
+  const currentTier = getTier(currentTierId);
   const unlimited = isUnlimitedTier(currentTier);
-  const percent = usagePercent(usage);
+  const percent = usagePercent({ ...usage, tierId: currentTierId });
   const remaining = unlimited
     ? 0
     : Math.max(0, currentTier.tokenLimit - usage.tokensUsed);
   const resetLabel = useMemo(() => nextResetLabel(locale), [locale]);
-  const showDev = devMode || usage.tierId === "dev";
+  const showDev = role === "admin";
   const visibleTiers = showDev ? [...PUBLIC_TIERS, DEV_TIER] : PUBLIC_TIERS;
   const currentTierName = t(TIER_TRANSLATION_KEYS[currentTier.id].name);
 
@@ -85,12 +77,6 @@ export default function TiersModal({
   useEffect(() => {
     if (open) {
       setMounted(true);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) {
-      setDevNotice(false);
     }
   }, [open]);
 
@@ -149,35 +135,6 @@ export default function TiersModal({
     };
   }, [mounted]);
 
-  useEffect(() => {
-    return () => {
-      if (clickTimerRef.current) {
-        window.clearTimeout(clickTimerRef.current);
-      }
-    };
-  }, []);
-
-  function handleTitleClick() {
-    clicksRef.current += 1;
-
-    if (clickTimerRef.current) {
-      window.clearTimeout(clickTimerRef.current);
-    }
-
-    clickTimerRef.current = window.setTimeout(() => {
-      clicksRef.current = 0;
-    }, 1_600);
-
-    setTitlePulse(true);
-    window.setTimeout(() => setTitlePulse(false), 240);
-
-    if (clicksRef.current >= SECRET_CLICKS) {
-      clicksRef.current = 0;
-      onUnlockDev();
-      setDevNotice(true);
-    }
-  }
-
   if (!mounted || typeof document === "undefined") {
     return null;
   }
@@ -197,8 +154,8 @@ export default function TiersModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className="absolute inset-0 bg-black/75 backdrop-blur-md"
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="absolute inset-0 bg-black/80"
           />
 
           <motion.div
@@ -206,32 +163,24 @@ export default function TiersModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="tiers-modal-title"
-            initial={{ opacity: 0, y: 28, scale: 0.965 }}
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 18, scale: 0.975 }}
+            exit={{ opacity: 0, y: 12, scale: 0.99 }}
             transition={{ type: "spring", stiffness: 320, damping: 32, mass: 0.9 }}
-            className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#07070a]/92 shadow-[0_50px_140px_-40px_rgba(0,0,0,0.98),0_0_90px_-40px_rgba(245,87,108,0.5)] backdrop-blur-2xl sm:max-h-[calc(100dvh-3rem)]"
+            className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-[#262626] bg-[#161616] shadow-[0_40px_120px_-32px_rgba(0,0,0,0.95)] sm:max-h-[calc(100dvh-3rem)]"
           >
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#f093fb]/70 to-transparent"
-            />
-
-            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-white/[0.07] px-5 py-5 sm:px-7 sm:py-6">
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[#262626] px-5 py-5 sm:px-7 sm:py-6">
               <div className="min-w-0">
-                <p className="text-sm font-medium uppercase tracking-[0.14em] text-[#f7a6ba]">
+                <p className="text-xs font-medium uppercase tracking-[0.14em] text-[#10B981]">
                   {t("tiers.eyebrow")}
                 </p>
-                <motion.h2
+                <h2
                   id="tiers-modal-title"
-                  onClick={handleTitleClick}
-                  animate={{ scale: titlePulse ? 1.02 : 1 }}
-                  transition={{ type: "spring", stiffness: 520, damping: 18 }}
-                  className="kael-display mt-2 cursor-pointer select-none text-2xl font-semibold tracking-[-0.02em] text-zinc-50"
+                  className="kael-display mt-2 text-xl font-semibold tracking-[-0.02em] text-[#F5F5F0]"
                 >
                   {t("tiers.title")}
-                </motion.h2>
-                <p className="mt-2 text-sm text-zinc-500">
+                </h2>
+                <p className="mt-2 text-sm text-[#8E8E8A]">
                   {showDev ? t("tiers.subtitleDev") : t("tiers.subtitle")}
                 </p>
               </div>
@@ -241,67 +190,33 @@ export default function TiersModal({
                 type="button"
                 onClick={onClose}
                 aria-label={t("tiers.close")}
-                className="shrink-0 rounded-xl border border-white/[0.08] p-2.5 text-zinc-500 transition hover:border-white/[0.16] hover:text-zinc-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5576c]/35"
+                className="shrink-0 rounded-lg border border-[#262626] p-2.5 text-[#8E8E8A] transition hover:border-[#3A3A3A] hover:bg-[#1C1C1C] hover:text-[#F5F5F0] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/40"
               >
                 <X size={18} strokeWidth={1.6} />
               </button>
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-7">
-              <AnimatePresence>
-                {devNotice && (
-                  <motion.div
-                    role="status"
-                    aria-live="polite"
-                    initial={{ opacity: 0, height: 0, y: -8 }}
-                    animate={{ opacity: 1, height: "auto", y: 0 }}
-                    exit={{ opacity: 0, height: 0, y: -8 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="mb-4 overflow-hidden"
-                  >
-                    <div className="flex items-center gap-3 rounded-xl border border-[#f093fb]/30 bg-[linear-gradient(135deg,rgba(240,147,251,0.14),rgba(245,87,108,0.08))] px-4 py-3">
-                      <KeyRound
-                        size={17}
-                        strokeWidth={1.7}
-                        className="shrink-0 text-[#f7a6ba]"
-                      />
-                      <p className="text-sm leading-6 text-zinc-200">
-                        {t("tiers.devActivated")}
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <motion.section
+              <section
                 aria-label={t("tiers.current")}
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05, type: "spring", stiffness: 280, damping: 28 }}
-                className={`rounded-2xl border p-5 sm:p-6 ${
-                  unlimited
-                    ? "border-[#f093fb]/35 bg-[linear-gradient(135deg,rgba(240,147,251,0.13),rgba(245,87,108,0.07),rgba(7,7,10,0.65))] shadow-[0_24px_80px_-44px_rgba(245,87,108,0.8)]"
-                    : "border-[#f093fb]/20 bg-kael-gradient-soft"
-                }`}
+                className="rounded-xl border border-[#262626] bg-[#0A0A0A] p-5 sm:p-6"
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm text-zinc-400">
+                    <p className="text-sm text-[#8E8E8A]">
                       {t("tiers.current")}
                     </p>
-                    <p className="kael-display mt-1 flex items-center gap-2 text-xl font-semibold text-zinc-50">
+                    <p className="kael-display mt-1 flex flex-wrap items-center gap-2 text-lg font-semibold text-[#F5F5F0]">
                       {currentTierName}
-                      {unlimited && (
-                        <span className="rounded-lg border border-[#f093fb]/30 bg-white/[0.06] px-2 py-1 text-sm font-medium tracking-[0.08em] text-[#f7a6ba]">
-                          DEV
-                        </span>
-                      )}
+                      <span className="rounded-md border border-[#262626] bg-[#161616] px-2 py-1 text-xs font-medium tracking-[0.08em] text-[#10B981]">
+                        {t(ROLE_KEYS[role])}
+                      </span>
                     </p>
                   </div>
-                  <span className="inline-flex items-center gap-2 rounded-xl border border-white/[0.1] bg-[#07070a]/70 px-3 py-2 text-sm text-zinc-300">
+                  <span className="inline-flex items-center gap-2 rounded-lg border border-[#262626] bg-[#161616] px-3 py-2 text-sm text-[#F5F5F0]">
                     <span
-                      className={`h-1.5 w-1.5 rounded-full bg-kael-gradient ${
-                        unlimited ? "kael-pulse" : ""
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        unlimited ? "bg-[#10B981]" : "bg-[#8E8E8A]"
                       }`}
                     />
                     {unlimited
@@ -314,7 +229,7 @@ export default function TiersModal({
 
                 <div className="mt-5">
                   <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-zinc-400">
+                    <span className="text-[#8E8E8A]">
                       {unlimited
                         ? t("tiers.tokensProcessed", {
                             count: formatNumber(usage.tokensUsed, locale),
@@ -324,7 +239,7 @@ export default function TiersModal({
                             limit: formatTokens(currentTier.tokenLimit, locale),
                           })}
                     </span>
-                    <span className="tabular-nums text-zinc-300">
+                    <span className="tabular-nums text-[#F5F5F0]">
                       {unlimited ? "∞" : `${Math.round(percent)}%`}
                     </span>
                   </div>
@@ -342,7 +257,7 @@ export default function TiersModal({
                             percent: Math.round(percent),
                           })
                     }
-                    className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-white/[0.08]"
+                    className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[#262626]"
                   >
                     <motion.div
                       initial={{ width: 0 }}
@@ -350,26 +265,23 @@ export default function TiersModal({
                         width: unlimited ? "100%" : `${Math.max(percent, 2)}%`,
                       }}
                       transition={{ type: "spring", stiffness: 90, damping: 22 }}
-                      className={`h-full rounded-full bg-kael-gradient shadow-[0_0_18px_rgba(245,87,108,0.55)] ${
-                        unlimited ? "kael-glow-pulse" : ""
-                      }`}
+                      className="h-full rounded-full bg-[#10B981]"
                     />
                   </div>
 
-                  <p className="mt-3 text-sm text-zinc-500">
+                  <p className="mt-3 text-sm text-[#8E8E8A]">
                     {unlimited
                       ? t("tiers.unlimitedNote")
                       : t("tiers.limitReset", { date: resetLabel })}
                   </p>
                 </div>
-              </motion.section>
+              </section>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 {visibleTiers.map((tier, index) => {
                   const Icon = TIER_ICONS[tier.id];
-                  const active = tier.id === usage.tierId;
+                  const active = tier.id === currentTierId;
                   const isDev = tier.id === "dev";
-                  const unavailable = !active && !isDev;
                   const tierCopy = TIER_TRANSLATION_KEYS[tier.id];
                   const tierName = t(tierCopy.name);
 
@@ -378,52 +290,44 @@ export default function TiersModal({
                       key={tier.id}
                       layout
                       aria-label={tierName}
-                      initial={{ opacity: 0, y: 16, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
                       transition={{
-                        delay: 0.08 + index * 0.045,
+                        delay: 0.05 + index * 0.04,
                         type: "spring",
-                        stiffness: 290,
-                        damping: 28,
+                        stiffness: 300,
+                        damping: 30,
                       }}
-                      className={`flex flex-col rounded-2xl border p-5 transition-colors duration-300 ${
-                        active && isDev
-                          ? "border-[#f093fb]/45 bg-[linear-gradient(150deg,rgba(240,147,251,0.14),rgba(245,87,108,0.07),rgba(7,7,10,0.92))] shadow-[0_24px_80px_-38px_rgba(245,87,108,0.9)]"
-                          : active
-                            ? "border-[#f093fb]/35 bg-[#0d0a10]/90 shadow-[0_24px_70px_-38px_rgba(245,87,108,0.7)]"
-                            : isDev
-                              ? "border-[#f093fb]/30 bg-[linear-gradient(150deg,rgba(240,147,251,0.09),rgba(245,87,108,0.04),rgba(7,7,10,0.8))] hover:border-[#f093fb]/50"
-                              : "border-white/[0.08] bg-[#07070a]/70 hover:border-white/[0.16]"
+                      className={`flex flex-col rounded-xl border p-5 ${
+                        active
+                          ? "border-[#10B981]/45 bg-[#0A0A0A]"
+                          : "border-[#262626] bg-[#0A0A0A]/60"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <span
-                          className={`flex h-9 w-9 items-center justify-center rounded-xl border ${
-                            active || isDev
-                              ? "border-[#f093fb]/30 bg-kael-gradient-soft text-[#f7a6ba]"
-                              : "border-white/[0.08] text-zinc-500"
+                          className={`flex h-9 w-9 items-center justify-center rounded-lg border ${
+                            active
+                              ? "border-[#10B981]/40 bg-[#10B981]/10 text-[#10B981]"
+                              : "border-[#262626] text-[#8E8E8A]"
                           }`}
                         >
                           <Icon size={17} strokeWidth={1.6} />
                         </span>
                         {active ? (
-                          <span className="rounded-lg border border-[#f093fb]/25 bg-white/[0.05] px-2.5 py-1 text-sm text-[#f7a6ba]">
-                            {t("tiers.active")}
-                          </span>
-                        ) : isDev ? (
-                          <span className="rounded-lg border border-[#f093fb]/30 bg-white/[0.05] px-2.5 py-1 text-sm text-[#f7a6ba]">
-                            {t("tiers.secret")}
+                          <span className="rounded-md border border-[#10B981]/30 bg-[#10B981]/10 px-2.5 py-1 text-xs text-[#10B981]">
+                            {isDev ? t("tiers.devBadge") : t("tiers.active")}
                           </span>
                         ) : null}
                       </div>
 
-                      <h3 className="kael-display mt-4 text-base font-semibold text-zinc-100">
+                      <h3 className="kael-display mt-4 text-base font-semibold text-[#F5F5F0]">
                         {tierName}
                       </h3>
-                      <p className="mt-1 text-sm text-zinc-500">
+                      <p className="mt-1 text-sm text-[#8E8E8A]">
                         {t(tierCopy.price)}
                       </p>
-                      <p className="mt-3 text-sm leading-6 text-zinc-400">
+                      <p className="mt-3 text-sm leading-6 text-[#8E8E8A]">
                         {t(tierCopy.description)}
                       </p>
 
@@ -431,12 +335,12 @@ export default function TiersModal({
                         {tierCopy.features.map((featureKey) => (
                           <li
                             key={featureKey}
-                            className="flex items-start gap-2.5 text-sm leading-5 text-zinc-400"
+                            className="flex items-start gap-2.5 text-sm leading-5 text-[#8E8E8A]"
                           >
                             <Check
                               size={15}
                               strokeWidth={2}
-                              className="mt-0.5 shrink-0 text-[#f7a6ba]"
+                              className="mt-0.5 shrink-0 text-[#10B981]"
                             />
                             {t(featureKey)}
                           </li>
@@ -445,36 +349,19 @@ export default function TiersModal({
 
                       <button
                         type="button"
-                        onClick={() => {
-                          if (isDev) {
-                            onSelectTier(tier.id);
-                          }
-                        }}
-                        disabled={active || unavailable}
-                        title={
-                          unavailable
-                            ? t("tiers.unavailableTitle")
-                            : undefined
-                        }
-                        className={`mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl px-3 text-sm font-medium transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5576c]/35 ${
+                        disabled
+                        className={`mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium ${
                           active
-                            ? "cursor-default border border-white/[0.08] text-zinc-500"
-                            : unavailable
-                              ? "cursor-not-allowed border border-white/[0.06] bg-white/[0.025] text-zinc-500"
-                              : "bg-kael-gradient text-[#1c0710] shadow-[0_14px_34px_-14px_rgba(245,87,108,0.75)] hover:brightness-110 active:scale-[0.98]"
+                            ? "border-[#10B981]/30 text-[#10B981]"
+                            : "cursor-not-allowed border-[#262626] bg-[#161616] text-[#8E8E8A]"
                         }`}
                       >
                         {active ? (
                           t("tiers.currentButton")
-                        ) : unavailable ? (
+                        ) : (
                           <>
                             <Lock size={14} strokeWidth={1.8} />
                             {t("tiers.unavailable")}
-                          </>
-                        ) : (
-                          <>
-                            {t("tiers.activate")}
-                            <ArrowUpRight size={15} strokeWidth={1.8} />
                           </>
                         )}
                       </button>
@@ -483,7 +370,7 @@ export default function TiersModal({
                 })}
               </div>
 
-              <p className="mt-5 text-sm leading-6 text-zinc-600">
+              <p className="mt-5 text-sm leading-6 text-[#8E8E8A]">
                 {t("tiers.footer")}
               </p>
             </div>

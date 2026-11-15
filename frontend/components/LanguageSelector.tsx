@@ -145,7 +145,7 @@ export default function LanguageSelector() {
         aria-controls={open ? listboxId : undefined}
         aria-label={t("language.select")}
         title={`${t("language.label")}: ${selected?.name ?? ""}`}
-        className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-[#07070a]/80 px-2.5 text-sm text-zinc-300 backdrop-blur-xl transition hover:border-[#f093fb]/45 hover:text-zinc-100 focus-visible:border-[#f093fb]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5576c]/30"
+        className="inline-flex h-10 items-center gap-2 rounded-xl border border-[#262626] bg-[#161616]/80 px-2.5 text-sm text-zinc-300 backdrop-blur-xl transition hover:border-[#10B981]/45 hover:text-zinc-100 focus-visible:border-[#10B981]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/30"
       >
         <Languages size={16} strokeWidth={1.7} className="shrink-0" />
         <span className="hidden text-sm font-medium tabular-nums sm:inline">
@@ -171,11 +171,11 @@ export default function LanguageSelector() {
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 380, damping: 30, mass: 0.7 }}
             style={{ transformOrigin: "top right" }}
-            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-48 overflow-hidden rounded-2xl border border-white/10 bg-[#07070a]/95 p-2 shadow-[0_30px_90px_-28px_rgba(0,0,0,0.96),0_0_60px_-30px_rgba(245,87,108,0.45)] backdrop-blur-xl"
+            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-48 overflow-hidden rounded-2xl border border-[#262626] bg-[#161616]/95 p-2 shadow-[0_30px_90px_-28px_rgba(0,0,0,0.96)] backdrop-blur-xl"
           >
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-[#f093fb]/65 to-transparent"
+              className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-[#10B981]/65 to-transparent"
             />
 
             {LANGUAGES.map((option, index) => {
@@ -193,19 +193,19 @@ export default function LanguageSelector() {
                   aria-selected={active}
                   onMouseEnter={() => setHighlighted(index)}
                   onClick={() => selectLanguage(option.id)}
-                  className={`relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition focus:outline-none focus-visible:bg-white/[0.07] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#f5576c]/35 ${
+                  className={`relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition focus:outline-none focus-visible:bg-[#1C1C1C] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#10B981]/35 ${
                     active
-                      ? "bg-kael-gradient-soft"
+                      ? "bg-[#10B981]/10"
                       : current
-                        ? "bg-white/[0.05]"
-                        : "hover:bg-white/[0.035]"
+                        ? "bg-[#1C1C1C]"
+                        : "hover:bg-[#1C1C1C]"
                   }`}
                 >
                   <span
                     className={`flex h-8 w-9 shrink-0 items-center justify-center rounded-lg border text-sm font-semibold tabular-nums ${
                       active
-                        ? "border-[#f093fb]/30 bg-white/[0.06] text-[#f7a6ba]"
-                        : "border-white/[0.08] text-zinc-500"
+                        ? "border-[#10B981]/30 bg-[#1C1C1C] text-[#34D399]"
+                        : "border-[#262626] text-zinc-500"
                     }`}
                   >
                     {option.label}
@@ -221,7 +221,7 @@ export default function LanguageSelector() {
                     <Check
                       size={15}
                       strokeWidth={2}
-                      className="shrink-0 text-[#f7a6ba]"
+                      className="shrink-0 text-[#34D399]"
                     />
                   )}
                 </button>

@@ -2,36 +2,36 @@
 
 import {
   ArrowUpRight,
-  AudioLines,
-  Code2,
   FileCode2,
   FileText,
-  ImageOff,
-  Layers,
   Menu,
-  Paperclip,
-  Volume2,
-  VolumeX,
+  ScrollText,
+  Settings,
 } from "lucide-react";
 import { MotionConfig, motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
-import ThreeBackground, {
-  type ThreeBackgroundQuality,
-} from "../components/ThreeBackground";
+import { useEffect, useCallback, useRef, useState } from "react";
+import ChangelogModal from "../components/ChangelogModal";
 import Composer from "../components/Composer";
-import CursorGlow from "../components/CursorGlow";
 import ArtifactDrawer from "../components/artifacts/ArtifactDrawer";
 import ArtifactMessageBody from "../components/artifacts/ArtifactMessageBody";
 import type { KaelArtifact } from "../components/artifacts/artifactParser";
+import { KAEL_TOUR_DONE_EVENT, KAEL_TOUR_DONE_KEY, restartKaelTour } from "../components/KaelTour";
+import { LandingDemo } from "../components/LandingDemo";
 import LanguageSelector from "../components/LanguageSelector";
+import { MascotCompanion } from "../components/MascotCompanion";
 import ModelSelector from "../components/ModelSelector";
 import ModeSelector from "../components/ModeSelector";
+import SettingsModal from "../components/SettingsModal";
 import Sidebar, { type SidebarSession } from "../components/Sidebar";
 import StreamingMessage from "../components/StreamingMessage";
 import ThinkingStatus from "../components/ThinkingStatus";
 import TiersModal from "../components/TiersModal";
 import { UserChip } from "../components/UserChip";
-import { authFetch } from "../lib/api";
+import { useKaelAuth } from "../components/auth/KaelAuthProvider";
+import LegalLinks from "../components/legal/LegalLinks";
+import McpApprovalPanel from "../components/mcp/McpApprovalPanel";
+import McpTrace from "../components/mcp/McpTrace";
+import { authFetch, isProvidersResponse, type ProvidersResponse } from "../lib/api";
 import {
   MAX_ATTACHMENTS,
   MAX_TOTAL_ATTACHMENT_BYTES,
@@ -51,10 +51,18 @@ import {
 } from "../lib/creator";
 import { useI18n } from "../lib/i18n";
 import {
+  MCP_CHANGED_EVENT,
+  fetchMcpServers,
+  type McpToolRequest,
+  type McpTraceEntry,
+} from "../lib/mcp";
+import { moodForError, moodForReply, type MascotPhase } from "../lib/mascot";
+import {
   DEFAULT_MODEL_BY_PROVIDER,
   DEFAULT_MODEL_ID,
   isModelId,
   isProviderId,
+  PROVIDER_IDS,
   providerOf,
 } from "../lib/models";
 import {
@@ -63,24 +71,30 @@ import {
   type ResponseMode,
 } from "../lib/modes";
 import {
+  DEFAULT_PREFERENCES,
+  buildPersonalization,
+  readPreferences,
+  writePreferences,
+  type KaelPreferences,
+} from "../lib/preferences";
+import {
   playSfx,
   setAmbientEnabled as setAmbientGlobal,
   setSfxEnabled as setSfxGlobal,
 } from "../lib/sfx";
+import type { SlimeMood } from "../lib/slime";
 import {
-  DEV_SECRET,
   createDefaultUsage,
   estimateTokens,
-  readDevMode,
   readUsage,
+  tierForRole,
   withAddedTokens,
   withTier,
-  writeDevMode,
   writeUsage,
-  type TierId,
   type UsageState,
 } from "../lib/tiers";
 import type { TranslationKey, Translate } from "../lib/translations";
+import { KAEL_CHANGELOG_SEEN_KEY, KAEL_VERSION, KAEL_VERSION_LABEL } from "../lib/version";
 
 type MessageRole = "user" | "assistant";
 
@@ -93,6 +107,7 @@ type ChatMessage = {
   durationMs?: number;
   mode?: ResponseMode;
   attachments?: Attachment[];
+  mcpTrace?: McpTraceEntry[];
 };
 
 type StoredSession = SidebarSession & {
@@ -104,6 +119,19 @@ type ChatApiResponse = {
   detail?: string;
   latency_ms?: number;
   tokens_used?: number;
+  status?: "ok" | "approval_required";
+  approval_token?: string | null;
+  tool_requests?: McpToolRequest[];
+  mcp_trace?: McpTraceEntry[];
+};
+
+type PendingApproval = {
+  token: string;
+  requests: McpToolRequest[];
+  userMessage: string;
+  mode: ResponseMode;
+  messageId: number;
+  devMode: boolean;
 };
 
 type PromptStarter = {
@@ -118,15 +146,12 @@ const BACKEND_URL = (
 const REQUEST_TIMEOUT_MS = 120_000;
 const HEALTH_CHECK_INTERVAL_MS = 20_000;
 const MAX_SESSIONS = 40;
-const AMBIENT_3D_ENABLED_BY_DEFAULT = true;
 
 const STORAGE_SESSIONS = "kael-sessions";
 const STORAGE_ACTIVE_SESSION = "kael-active-session";
 const STORAGE_MODEL = "kael-model";
 const STORAGE_LEGACY_PROVIDER = "kael-provider";
 const STORAGE_MODE = "kael-mode";
-const STORAGE_3D = "kael-3d-enabled";
-const STORAGE_QUALITY = "kael-3d-quality";
 const STORAGE_SFX = "kael-sfx-enabled";
 const STORAGE_AMBIENT = "kael-ambient-enabled";
 
@@ -153,23 +178,24 @@ const PROMPT_STARTERS: PromptStarter[] = [
   },
 ];
 
-const CAPABILITIES = [
-  {
-    icon: Code2,
-    title: "capabilities.code.title",
-    description: "capabilities.code.description",
-  },
-  {
-    icon: FileText,
-    title: "capabilities.docs.title",
-    description: "capabilities.docs.description",
-  },
-  {
-    icon: Paperclip,
-    title: "capabilities.files.title",
-    description: "capabilities.files.description",
-  },
-] as const;
+function isMcpTraceEntry(value: unknown): value is McpTraceEntry {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const entry = value as Partial<McpTraceEntry>;
+
+  return (
+    typeof entry.server_id === "string" &&
+    typeof entry.server_name === "string" &&
+    typeof entry.tool === "string" &&
+    (entry.status === "ok" ||
+      entry.status === "error" ||
+      entry.status === "denied") &&
+    typeof entry.duration_ms === "number" &&
+    (entry.error === null || typeof entry.error === "string")
+  );
+}
 
 function isChatMessage(value: unknown): value is ChatMessage {
   if (typeof value !== "object" || value === null) {
@@ -199,6 +225,14 @@ function isChatMessage(value: unknown): value is ChatMessage {
     message.attachments !== undefined &&
     (!Array.isArray(message.attachments) ||
       !message.attachments.every(isStoredAttachment))
+  ) {
+    return false;
+  }
+
+  if (
+    message.mcpTrace !== undefined &&
+    (!Array.isArray(message.mcpTrace) ||
+      !message.mcpTrace.every(isMcpTraceEntry))
   ) {
     return false;
   }
@@ -300,100 +334,114 @@ function getRequestError(error: unknown, t: Translate): string {
 
 function LandingState({
   onPrompt,
+  onOpenChangelog,
   disabled,
+  reduceMotion,
+  showDemo,
+  showQuickStart,
 }: {
   onPrompt: (prompt: string) => void;
+  onOpenChangelog: () => void;
   disabled: boolean;
+  reduceMotion: boolean;
+  showDemo: boolean;
+  showQuickStart: boolean;
 }) {
   const { t } = useI18n();
 
   return (
-    <section className="flex min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
-      <div className="mx-auto my-auto w-full max-w-4xl">
-        <div className="mb-5 flex items-center gap-3">
-          <span className="h-px w-8 bg-kael-gradient" />
-          <span className="kael-display text-sm font-medium uppercase tracking-[0.14em] text-[#f7a6ba]">
-            {t("landing.badge")}
-          </span>
-          <span className="h-px flex-1 bg-gradient-to-r from-[#f5576c]/30 to-transparent" />
-        </div>
+    <section className="flex min-h-0 flex-1 overflow-y-auto px-4 pb-16 pt-6 sm:px-6 sm:pb-20 sm:pt-8">
+      <div className="mx-auto my-auto w-full max-w-6xl">
+        <div
+          className={`grid gap-8 ${
+            showDemo
+              ? "xl:grid-cols-[minmax(0,1fr)_minmax(400px,440px)] xl:items-center xl:gap-12"
+              : "xl:grid-cols-1"
+          }`}
+        >
+          <div className="min-w-0">
+            <div className="mb-5 flex items-center gap-3">
+              <span className="h-px w-8 bg-[#10B981]" />
+              <span className="kael-display shrink-0 text-xs font-medium uppercase tracking-[0.14em] text-[#10B981] sm:text-sm">
+                {t("landing.badge")}
+              </span>
+              <span className="h-px flex-1 bg-[#262626]" />
+              <button
+                type="button"
+                onClick={onOpenChangelog}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#262626] bg-[#161616] px-2.5 py-1.5 text-xs font-medium text-[#8E8E8A] transition hover:border-[#10B981]/40 hover:text-[#F5F5F0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/40"
+              >
+                <ScrollText size={13} strokeWidth={1.7} aria-hidden="true" />
+                {t("changelog.open")}
+                <span className="hidden tabular-nums text-[#10B981] sm:inline">
+                  {KAEL_VERSION_LABEL}
+                </span>
+              </button>
+            </div>
 
-        <h1 className="kael-display max-w-3xl text-[clamp(2.3rem,5.2vw,3.6rem)] font-semibold leading-[1.05] tracking-[-0.035em] text-zinc-50">
-          {t("landing.title1")}
-          <br />
-          <span className="kael-gradient-text">{t("landing.title2")}</span>
-        </h1>
+            <h1 className="kael-display max-w-3xl text-[clamp(2.1rem,3.2vw,3rem)] font-semibold leading-[1.08] tracking-[-0.035em] text-zinc-50">
+              {t("landing.title1")}
+              <br />
+              <span className="text-[#10B981]">{t("landing.title2")}</span>
+            </h1>
 
-        <p className="mt-5 max-w-xl text-base leading-8 text-zinc-400">
-          {t("landing.description")}
-        </p>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-zinc-400 sm:text-base sm:leading-8">
+              {t("landing.description")}
+            </p>
 
-        <div className="mt-7 grid gap-2.5 sm:grid-cols-2">
-          {PROMPT_STARTERS.map((starter, index) => (
-            <button
-              key={starter.title}
-              type="button"
-              onClick={() => onPrompt(t(starter.prompt))}
-              disabled={disabled}
-              className="group rounded-2xl border border-white/[0.08] bg-[#07070a]/70 p-4 text-left backdrop-blur-2xl transition hover:border-[#f093fb]/30 hover:bg-[#0d0d12]/80 hover:shadow-[0_24px_60px_-34px_rgba(245,87,108,0.6)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-[#f7a6ba]">
-                    {String(index + 1).padStart(2, "0")}
-                  </p>
-                  <p className="mt-2 text-base font-semibold text-zinc-100">
-                    {t(starter.title)}
-                  </p>
-                  <p className="mt-1.5 text-sm leading-6 text-zinc-500">
-                    {t(starter.description)}
-                  </p>
+            {showQuickStart && (
+              <>
+                <div className="mb-2.5 mt-6 flex items-center gap-3">
+                  <span className="kael-display text-[11px] font-medium uppercase tracking-[0.14em] text-[#8E8E8A]">
+                    {t("landing.quickStart")}
+                  </span>
+                  <span className="h-px flex-1 bg-[#1C1C1C]" />
                 </div>
-                <ArrowUpRight
-                  size={18}
-                  strokeWidth={1.5}
-                  className="mt-0.5 shrink-0 text-zinc-600 transition group-hover:text-[#f5576c]"
-                />
-              </div>
-            </button>
-          ))}
-        </div>
 
-        <div className="mt-6 border-t border-white/[0.07] pt-4">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <span className="kael-display text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">
-              {t("capabilities.title")}
-            </span>
-            <span className="hidden h-px min-w-6 flex-1 bg-white/[0.06] sm:block" />
-            <span className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
-              <ImageOff
-                size={13}
-                strokeWidth={1.6}
-                className="shrink-0 text-zinc-600"
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {PROMPT_STARTERS.map((starter, index) => (
+                    <button
+                      key={starter.title}
+                      type="button"
+                      onClick={() => onPrompt(t(starter.prompt))}
+                      disabled={disabled}
+                      title={t(starter.description)}
+                      className="group flex min-w-0 items-center gap-2.5 rounded-xl border border-[#262626] bg-[#161616] px-3 py-2.5 text-left transition hover:border-[#10B981]/40 hover:bg-[#1C1C1C] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <span className="text-xs font-medium tabular-nums text-[#10B981]">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-200">
+                        {t(starter.title)}
+                      </span>
+                      <ArrowUpRight
+                        size={15}
+                        strokeWidth={1.6}
+                        className="shrink-0 text-zinc-600 transition group-hover:text-[#10B981]"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {showDemo && (
+            <div className="min-w-0">
+              <LandingDemo
+                onPrompt={onPrompt}
+                disabled={disabled}
+                reduceMotion={reduceMotion}
               />
-              {t("capabilities.noImages")}
-            </span>
-          </div>
+            </div>
+          )}
+        </div>
 
-          <div className="mt-3 grid gap-3 sm:grid-cols-3 sm:gap-5">
-            {CAPABILITIES.map(({ icon: Icon, title, description }) => (
-              <div key={title} className="flex items-start gap-2.5">
-                <Icon
-                  size={17}
-                  strokeWidth={1.6}
-                  className="mt-0.5 shrink-0 text-[#f7a6ba]"
-                />
-                <div>
-                  <p className="text-sm font-medium text-zinc-200">
-                    {t(title)}
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-zinc-500">
-                    {t(description)}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-[#262626] pt-5">
+          <span className="text-xs tabular-nums text-[#8E8E8A]">
+            KAEL {KAEL_VERSION_LABEL}
+          </span>
+          <LegalLinks />
         </div>
       </div>
     </section>
@@ -424,9 +472,9 @@ function MessageAttachments({ attachments }: { attachments: Attachment[] }) {
                 key={attachment.id}
                 href={url}
                 target="_blank"
-                rel="noreferrer"
+                rel="noopener noreferrer"
                 title={attachment.name}
-                className="group overflow-hidden rounded-xl border border-white/[0.09] bg-white/[0.03]"
+                className="group overflow-hidden rounded-xl border border-[#262626] bg-[#1C1C1C]"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -448,12 +496,12 @@ function MessageAttachments({ attachments }: { attachments: Attachment[] }) {
             return (
               <span
                 key={attachment.id}
-                className="inline-flex max-w-full items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2"
+                className="inline-flex max-w-full items-center gap-2 rounded-xl border border-[#262626] bg-[#1C1C1C] px-3 py-2"
               >
                 <Icon
                   size={16}
                   strokeWidth={1.6}
-                  className="shrink-0 text-[#f7a6ba]"
+                  className="shrink-0 text-[#10B981]"
                 />
                 <span className="min-w-0">
                   <span className="block max-w-[12rem] truncate text-sm font-medium text-zinc-200">
@@ -512,7 +560,7 @@ function ChatMessageRow({
         }`}
       >
         {!isUser && (
-          <span className="kael-display flex h-6 w-6 items-center justify-center rounded-md bg-kael-gradient text-sm font-semibold text-[#1c0710]">
+          <span className="kael-display flex h-6 w-6 items-center justify-center rounded-md bg-[#10B981] text-sm font-semibold text-[#052E1C]">
             K
           </span>
         )}
@@ -540,7 +588,7 @@ function ChatMessageRow({
 
       {isUser ? (
         <div className="flex max-w-[92%] flex-col items-end gap-2.5 sm:max-w-[85%]">
-          <p className="whitespace-pre-wrap rounded-2xl rounded-tr-md border border-white/[0.08] bg-white/[0.05] px-5 py-4 text-base leading-8 text-zinc-100 backdrop-blur-xl">
+          <p className="whitespace-pre-wrap rounded-2xl rounded-tr-md border border-[#262626] bg-[#1C1C1C] px-5 py-4 text-base leading-8 text-zinc-100 backdrop-blur-xl">
             {message.content}
           </p>
           {message.attachments && message.attachments.length > 0 && (
@@ -571,6 +619,10 @@ function ChatMessageRow({
               onOpenArtifact={onOpenArtifact}
             />
           )}
+
+          {message.mcpTrace && message.mcpTrace.length > 0 && (
+            <McpTrace entries={message.mcpTrace} />
+          )}
         </div>
       )}
     </motion.article>
@@ -579,6 +631,7 @@ function ChatMessageRow({
 
 export default function ChatPage() {
   const { language, t } = useI18n();
+  const { role } = useKaelAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sessions, setSessions] = useState<StoredSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState("");
@@ -589,11 +642,9 @@ export default function ChatPage() {
   const [activeArtifact, setActiveArtifact] = useState<KaelArtifact | null>(null);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+  const [mascotPhase, setMascotPhase] = useState<MascotPhase>("idle");
+  const [mascotMood, setMascotMood] = useState<SlimeMood>("happy");
   const [isOnline, setIsOnline] = useState(false);
-  const [threeEnabled, setThreeEnabled] = useState(
-    AMBIENT_3D_ENABLED_BY_DEFAULT,
-  );
-  const [quality, setQuality] = useState<ThreeBackgroundQuality>("low");
   const [nextMessageId, setNextMessageId] = useState(1);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -602,28 +653,84 @@ export default function ChatPage() {
   const [isReadingFiles, setIsReadingFiles] = useState(false);
   const [sfxOn, setSfxOn] = useState(true);
   const [ambientOn, setAmbientOn] = useState(false);
-  const [typingEnergy, setTypingEnergy] = useState(0);
+  const [preferences, setPreferences] = useState<KaelPreferences>(
+    DEFAULT_PREFERENCES,
+  );
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [changelogOpen, setChangelogOpen] = useState(false);
   const [streamingId, setStreamingId] = useState<number | null>(null);
-  const [devMode, setDevMode] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [providers, setProviders] = useState<ProvidersResponse | null>(null);
+  const [providersLoading, setProvidersLoading] = useState(true);
+  const [mcpServerIds, setMcpServerIds] = useState<string[]>([]);
+  const [pendingApproval, setPendingApproval] =
+    useState<PendingApproval | null>(null);
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const ambientRef = useRef<HTMLDivElement>(null);
-  const typingEnergyRef = useRef(0);
-  const typingDecayRef = useRef(0);
+  const changelogAutoRef = useRef(false);
+  const preferencesRef = useRef(preferences);
   const tRef = useRef(t);
   tRef.current = t;
+  preferencesRef.current = preferences;
+
+  const refreshProviders = useCallback(async () => {
+    setProvidersLoading(true);
+
+    try {
+      const response = await authFetch("/api/providers");
+      if (!response.ok) {
+        setProviders(null);
+        return;
+      }
+
+      const data: unknown = await response.json();
+      if (!isProvidersResponse(data)) {
+        setProviders(null);
+        return;
+      }
+
+      setProviders(data);
+
+      const available = PROVIDER_IDS.filter((provider) => data[provider]);
+      const fallback = available[0];
+
+      if (fallback) {
+        setModelId((current) =>
+          available.includes(providerOf(current))
+            ? current
+            : DEFAULT_MODEL_BY_PROVIDER[fallback],
+        );
+      }
+    } catch {
+      setProviders(null);
+    } finally {
+      setProvidersLoading(false);
+    }
+  }, []);
+
+  const refreshMcpServers = useCallback(async () => {
+    try {
+      const servers = await fetchMcpServers();
+      setMcpServerIds(
+        servers
+          .filter((server) => server.enabled && server.status === "connected")
+          .map((server) => server.id),
+      );
+    } catch {
+      setMcpServerIds([]);
+    }
+  }, []);
 
   useEffect(() => {
-    const saved3D = safeRead(STORAGE_3D);
-    if (saved3D === "true" || saved3D === "false") {
-      setThreeEnabled(saved3D === "true");
-    }
+    void refreshMcpServers();
 
-    const savedQuality = safeRead(STORAGE_QUALITY);
-    if (savedQuality === "low" || savedQuality === "high") {
-      setQuality(savedQuality);
-    }
+    const handleChange = () => void refreshMcpServers();
+    window.addEventListener(MCP_CHANGED_EVENT, handleChange);
+    return () => window.removeEventListener(MCP_CHANGED_EVENT, handleChange);
+  }, [refreshMcpServers]);
 
+  useEffect(() => {
     const savedModel = safeRead(STORAGE_MODEL);
     if (isModelId(savedModel)) {
       setModelId(savedModel);
@@ -648,15 +755,9 @@ export default function ChatPage() {
     setAmbientOn(savedAmbient);
     setAmbientGlobal(savedAmbient);
 
-    const savedDevMode = readDevMode();
-    setDevMode(savedDevMode);
+    setPreferences(readPreferences());
 
-    let initialUsage = readUsage();
-    if (savedDevMode && initialUsage.tierId !== "dev") {
-      initialUsage = withTier(initialUsage, "dev");
-      writeUsage(initialUsage);
-    }
-    setUsage(initialUsage);
+    setUsage(readUsage());
 
     const savedSessions = safeRead(STORAGE_SESSIONS);
     if (savedSessions) {
@@ -688,6 +789,80 @@ export default function ChatPage() {
     setHydrated(true);
   }, []);
 
+  // A saved/default model can point at a provider without a key. Ask the
+  // backend which providers are live and move to one that can answer.
+  useEffect(() => {
+    void refreshProviders();
+  }, [refreshProviders]);
+
+  // Returning users already finished the tour, so surface the changelog once.
+  useEffect(() => {
+    if (!hydrated || changelogAutoRef.current) {
+      return;
+    }
+
+    changelogAutoRef.current = true;
+
+    if (!preferencesRef.current.changelogAuto) {
+      return;
+    }
+
+    let seen = false;
+    let tourDone = false;
+
+    try {
+      seen = localStorage.getItem(KAEL_CHANGELOG_SEEN_KEY) === KAEL_VERSION;
+      tourDone = localStorage.getItem(KAEL_TOUR_DONE_KEY) === "1";
+    } catch {
+      // Storage can be unavailable; skip the automatic changelog.
+    }
+
+    if (seen || !tourDone) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setChangelogOpen(true), 850);
+    return () => window.clearTimeout(timer);
+  }, [hydrated]);
+
+  // A natural tour completion opens the changelog once, after the tour closes.
+  useEffect(() => {
+    const onTourDone = (event: Event) => {
+      const detail = (event as CustomEvent<{ completed?: boolean }>).detail;
+      if (!detail?.completed || !preferencesRef.current.changelogAuto) {
+        return;
+      }
+
+      let seen = false;
+      try {
+        seen = localStorage.getItem(KAEL_CHANGELOG_SEEN_KEY) === KAEL_VERSION;
+      } catch {
+        // Storage can be unavailable; still show the changelog once.
+      }
+
+      if (seen) {
+        return;
+      }
+
+      window.setTimeout(() => setChangelogOpen(true), 240);
+    };
+
+    window.addEventListener(KAEL_TOUR_DONE_EVENT, onTourDone);
+    return () => window.removeEventListener(KAEL_TOUR_DONE_EVENT, onTourDone);
+  }, []);
+
+  useEffect(() => {
+    setUsage((current) => {
+      const tierId = tierForRole(role);
+      if (current.tierId === tierId) {
+        return current;
+      }
+      const next = withTier(current, tierId);
+      writeUsage(next);
+      return next;
+    });
+  }, [role]);
+
   useEffect(() => {
     if (!hydrated) {
       return;
@@ -717,6 +892,38 @@ export default function ChatPage() {
     setAmbientGlobal(ambientOn);
     safeWrite(STORAGE_AMBIENT, String(ambientOn));
   }, [hydrated, ambientOn]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+    writePreferences(preferences);
+  }, [hydrated, preferences]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    const root = document.documentElement;
+    root.dataset.theme = preferences.theme;
+    root.dataset.interfaceFont = preferences.interfaceFont;
+    root.dataset.displayFont = preferences.displayFont;
+    root.style.colorScheme = preferences.theme;
+
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute(
+        "content",
+        preferences.theme === "light" ? "#F5F7F3" : "#0A0A0A",
+      );
+    }
+  }, [
+    hydrated,
+    preferences.theme,
+    preferences.interfaceFont,
+    preferences.displayFont,
+  ]);
 
   useEffect(() => {
     let lastElement: Element | null = null;
@@ -756,64 +963,6 @@ export default function ChatPage() {
     return () => {
       window.removeEventListener("pointerover", handlePointerOver);
       window.removeEventListener("pointerout", handlePointerOut);
-    };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (typingDecayRef.current) {
-        window.clearInterval(typingDecayRef.current);
-        typingDecayRef.current = 0;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const layer = ambientRef.current;
-    if (!layer) {
-      return undefined;
-    }
-
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return undefined;
-    }
-
-    let targetX = 0;
-    let targetY = 0;
-    let currentX = 0;
-    let currentY = 0;
-    let raf = 0;
-
-    const frame = () => {
-      currentX += (targetX - currentX) * 0.07;
-      currentY += (targetY - currentY) * 0.07;
-      layer.style.transform = `translate3d(${currentX.toFixed(2)}px, ${currentY.toFixed(2)}px, 0) scale(1.03)`;
-
-      if (
-        Math.abs(targetX - currentX) > 0.05 ||
-        Math.abs(targetY - currentY) > 0.05
-      ) {
-        raf = window.requestAnimationFrame(frame);
-      } else {
-        raf = 0;
-      }
-    };
-
-    const handlePointerMove = (event: PointerEvent) => {
-      targetX = (event.clientX / Math.max(window.innerWidth, 1) - 0.5) * 26;
-      targetY = (event.clientY / Math.max(window.innerHeight, 1) - 0.5) * 20;
-
-      if (!raf) {
-        raf = window.requestAnimationFrame(frame);
-      }
-    };
-
-    window.addEventListener("pointermove", handlePointerMove, { passive: true });
-
-    return () => {
-      window.cancelAnimationFrame(raf);
-      window.removeEventListener("pointermove", handlePointerMove);
-      layer.style.transform = "";
     };
   }, []);
 
@@ -886,104 +1035,48 @@ export default function ChatPage() {
   }, []);
 
   useEffect(() => {
+    if (!preferences.autoScroll) {
+      return;
+    }
+
     bottomRef.current?.scrollIntoView({
-      behavior: "smooth",
+      behavior: preferences.reduceMotion ? "auto" : "smooth",
       block: "end",
     });
-  }, [isThinking, messages]);
+  }, [isThinking, messages, preferences.autoScroll, preferences.reduceMotion]);
 
-  function toggle3D() {
-    playSfx("toggle");
-    setThreeEnabled((current) => {
-      const next = !current;
-      safeWrite(STORAGE_3D, String(next));
-      return next;
-    });
-  }
-
-  function changeQuality(next: ThreeBackgroundQuality) {
-    playSfx("click");
-    setQuality(next);
-    safeWrite(STORAGE_QUALITY, next);
-  }
-
-  function toggleSfx() {
-    const next = !sfxOn;
-    setSfxOn(next);
-    setSfxGlobal(next);
-    if (next) {
+  function updateSfx(enabled: boolean) {
+    setSfxOn(enabled);
+    setSfxGlobal(enabled);
+    if (enabled) {
       playSfx("toggle");
     }
   }
 
-  function toggleAmbient() {
-    const next = !ambientOn;
-    setAmbientOn(next);
-    setAmbientGlobal(next);
-    if (next) {
+  function updateAmbient(enabled: boolean) {
+    setAmbientOn(enabled);
+    setAmbientGlobal(enabled);
+    if (enabled) {
       playSfx("toggle");
-    }
-  }
-
-  function bumpTypingEnergy() {
-    typingEnergyRef.current = Math.min(1, typingEnergyRef.current + 0.3);
-    setTypingEnergy(typingEnergyRef.current);
-
-    if (!typingDecayRef.current) {
-      typingDecayRef.current = window.setInterval(() => {
-        typingEnergyRef.current = Math.max(0, typingEnergyRef.current - 0.085);
-        setTypingEnergy(typingEnergyRef.current);
-
-        if (typingEnergyRef.current <= 0) {
-          window.clearInterval(typingDecayRef.current);
-          typingDecayRef.current = 0;
-        }
-      }, 90);
     }
   }
 
   function handleInputChange(value: string) {
     setInput(value);
-    if (value.trim().length > 0) {
-      bumpTypingEnergy();
-    }
   }
 
   function handleStreamComplete(messageId: number) {
-    setStreamingId((current) => (current === messageId ? null : current));
+    if (streamingId !== messageId) {
+      return;
+    }
+    setStreamingId(null);
+    setMascotPhase((current) => (current === "typing" ? "done" : current));
     playSfx("success");
   }
 
   function handleOpenArtifact(artifact: KaelArtifact) {
     playSfx("open");
     setActiveArtifact(artifact);
-  }
-
-  function selectTier(tierId: TierId) {
-    if (tierId !== "dev") {
-      return;
-    }
-
-    setDevMode(true);
-    writeDevMode(true);
-    setUsage((current) => {
-      const next = withTier(current, tierId);
-      writeUsage(next);
-      return next;
-    });
-    playSfx("success");
-    setTiersOpen(false);
-  }
-
-  function unlockDev() {
-    setDevMode(true);
-    writeDevMode(true);
-    setUsage((current) => {
-      const next = withTier(current, "dev");
-      writeUsage(next);
-      return next;
-    });
-    playSfx("success");
   }
 
   async function addFiles(files: File[]) {
@@ -1072,23 +1165,31 @@ export default function ChatPage() {
     playSfx("click");
   }
 
+  function discardApproval() {
+    setPendingApproval(null);
+    setApprovalError(null);
+  }
+
   function newChat() {
-    if (isThinking) {
+    if (isThinking || approvalBusy) {
       return;
     }
 
+    discardApproval();
     setActiveSessionId(`session-${Date.now()}`);
     setMessages([]);
     setNextMessageId(1);
     setInput("");
     setAttachments([]);
     setAttachmentError(null);
+    setStreamingId(null);
+    setMascotPhase("idle");
     setMobileSidebarOpen(false);
     playSfx("open");
   }
 
   function selectSession(id: string) {
-    if (isThinking) {
+    if (isThinking || approvalBusy) {
       return;
     }
 
@@ -1097,14 +1198,70 @@ export default function ChatPage() {
       return;
     }
 
+    discardApproval();
     setActiveSessionId(selected.id);
     setMessages(selected.messages);
     setNextMessageId(nextIdFromMessages(selected.messages));
     setInput("");
     setAttachments([]);
     setAttachmentError(null);
+    setStreamingId(null);
+    setMascotPhase("idle");
     setMobileSidebarOpen(false);
     playSfx("click");
+  }
+
+  function commitAssistantReply(
+    data: ChatApiResponse,
+    context: {
+      messageId: number;
+      userMessage: string;
+      mode: ResponseMode;
+      devMode: boolean;
+      clientDurationMs: number;
+    },
+  ): boolean {
+    const reply = data.reply?.trim();
+    if (!reply) {
+      return false;
+    }
+
+    const reportedTokens = data.tokens_used;
+    const usedTokens =
+      typeof reportedTokens === "number" &&
+      Number.isFinite(reportedTokens) &&
+      reportedTokens > 0
+        ? Math.round(reportedTokens)
+        : estimateTokens(context.userMessage) + estimateTokens(reply);
+
+    if (!context.devMode) {
+      setUsage((current) => {
+        const next = withAddedTokens(current, usedTokens);
+        writeUsage(next);
+        return next;
+      });
+    }
+
+    setMessages((current) => [
+      ...current,
+      {
+        id: context.messageId,
+        role: "assistant",
+        content: reply,
+        isError: false,
+        userMessage: context.userMessage,
+        durationMs: data.latency_ms ?? context.clientDurationMs,
+        mode: context.mode,
+        ...(data.mcp_trace && data.mcp_trace.length > 0
+          ? { mcpTrace: data.mcp_trace }
+          : {}),
+      },
+    ]);
+    setStreamingId(context.messageId);
+    setMascotMood(moodForReply(reply, context.mode));
+    setMascotPhase("typing");
+    playSfx("success");
+    return true;
   }
 
   async function sendMessage(messageOverride?: string) {
@@ -1114,7 +1271,8 @@ export default function ChatPage() {
     if (
       (!typedInput && pendingAttachments.length === 0) ||
       isThinking ||
-      isReadingFiles
+      isReadingFiles ||
+      pendingApproval !== null
     ) {
       return;
     }
@@ -1127,7 +1285,7 @@ export default function ChatPage() {
       .filter(
         (attachment): attachment is AttachmentPayload => attachment !== null,
       );
-    const devBypass = devMode && usage.tierId === "dev";
+    const devBypass = role === "admin";
     const sessionId = activeSessionId || `session-${Date.now()}`;
     const userMessageId = nextMessageId;
     const assistantMessageId = nextMessageId + 1;
@@ -1135,6 +1293,7 @@ export default function ChatPage() {
     const selectedProvider = providerOf(selectedModelId);
     const selectedMode = mode;
     const startedAt = performance.now();
+    const personalization = buildPersonalization(preferences);
 
     setActiveSessionId(sessionId);
     setMessages((current) => [
@@ -1154,6 +1313,7 @@ export default function ChatPage() {
     setAttachmentError(null);
     setNextMessageId((current) => current + 2);
     setIsThinking(true);
+    setMascotPhase("thinking");
     setMobileSidebarOpen(false);
     playSfx("send");
 
@@ -1174,6 +1334,8 @@ export default function ChatPage() {
       ]);
       setStreamingId(assistantMessageId);
       setIsThinking(false);
+      setMascotMood("cool");
+      setMascotPhase("typing");
       playSfx("success");
       return;
     }
@@ -1187,9 +1349,6 @@ export default function ChatPage() {
     try {
       const response = await authFetch("/api/chat", {
         method: "POST",
-        headers: {
-          ...(devBypass ? { "X-Developer-Secret": DEV_SECRET } : {}),
-        },
         body: JSON.stringify({
           message: effectiveText,
           model: selectedModelId,
@@ -1197,8 +1356,12 @@ export default function ChatPage() {
           mode: selectedMode,
           language,
           dev_mode: devBypass,
+          ...(personalization ? { personalization } : {}),
           ...(payloadAttachments.length > 0
             ? { attachments: payloadAttachments }
+            : {}),
+          ...(mcpServerIds.length > 0
+            ? { mcp_server_ids: mcpServerIds }
             : {}),
         }),
         signal: controller.signal,
@@ -1217,44 +1380,44 @@ export default function ChatPage() {
         );
       }
 
-      const reply = data?.reply?.trim();
-      if (!reply) {
-        throw new Error(t("error.backendEmpty"));
+      const approvalRequests = data?.tool_requests ?? [];
+      if (
+        data?.status === "approval_required" &&
+        data.approval_token &&
+        approvalRequests.length > 0
+      ) {
+        setPendingApproval({
+          token: data.approval_token,
+          requests: approvalRequests,
+          userMessage: effectiveText,
+          mode: selectedMode,
+          messageId: assistantMessageId,
+          devMode: devBypass,
+        });
+        setApprovalError(null);
+        setMascotMood("cool");
+        setMascotPhase("idle");
+        return;
       }
 
       const clientDurationMs = Math.round(performance.now() - startedAt);
-      const reportedTokens = data?.tokens_used;
-      const usedTokens =
-        typeof reportedTokens === "number" &&
-        Number.isFinite(reportedTokens) &&
-        reportedTokens > 0
-          ? Math.round(reportedTokens)
-          : estimateTokens(effectiveText) + estimateTokens(reply);
-
-      if (!devBypass) {
-        setUsage((current) => {
-          const next = withAddedTokens(current, usedTokens);
-          writeUsage(next);
-          return next;
-        });
-      }
-
-      setMessages((current) => [
-        ...current,
-        {
-          id: assistantMessageId,
-          role: "assistant",
-          content: reply,
-          isError: false,
+      if (
+        !data ||
+        !commitAssistantReply(data, {
+          messageId: assistantMessageId,
           userMessage: effectiveText,
-          durationMs: data?.latency_ms ?? clientDurationMs,
           mode: selectedMode,
-        },
-      ]);
-      setStreamingId(assistantMessageId);
-      playSfx("success");
+          devMode: devBypass,
+          clientDurationMs,
+        })
+      ) {
+        throw new Error(t("error.backendEmpty"));
+      }
     } catch (error) {
       const durationMs = Math.round(performance.now() - startedAt);
+
+      setMascotMood(moodForError(error));
+      setMascotPhase("error");
 
       setMessages((current) => [
         ...current,
@@ -1275,39 +1438,152 @@ export default function ChatPage() {
     }
   }
 
+  async function resolveApproval(decisions: Record<string, boolean>) {
+    const context = pendingApproval;
+    if (!context || approvalBusy) {
+      return;
+    }
+
+    setApprovalBusy(true);
+    setApprovalError(null);
+    const startedAt = performance.now();
+
+    try {
+      const response = await authFetch("/api/chat/approve", {
+        method: "POST",
+        body: JSON.stringify({
+          token: context.token,
+          decisions,
+        }),
+      });
+
+      let data: ChatApiResponse | null = null;
+      try {
+        data = (await response.json()) as ChatApiResponse;
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        if (response.status === 410) {
+          setPendingApproval(null);
+          setMessages((current) => [
+            ...current,
+            {
+              id: context.messageId,
+              role: "assistant",
+              content: t("chat.mcp.approvalExpired"),
+              isError: true,
+              userMessage: context.userMessage,
+              durationMs: Math.round(performance.now() - startedAt),
+              mode: context.mode,
+            },
+          ]);
+          setMascotPhase("error");
+          playSfx("error");
+          return;
+        }
+
+        throw new Error(data?.detail ?? t("chat.mcp.approvalError"));
+      }
+
+      const nextRequests = data?.tool_requests ?? [];
+      if (
+        data?.status === "approval_required" &&
+        data.approval_token &&
+        nextRequests.length > 0
+      ) {
+        setPendingApproval({
+          ...context,
+          token: data.approval_token,
+          requests: nextRequests,
+        });
+        return;
+      }
+
+      if (
+        !data ||
+        !commitAssistantReply(data, {
+          messageId: context.messageId,
+          userMessage: context.userMessage,
+          mode: context.mode,
+          devMode: context.devMode,
+          clientDurationMs: Math.round(performance.now() - startedAt),
+        })
+      ) {
+        throw new Error(t("chat.mcp.approvalError"));
+      }
+
+      setPendingApproval(null);
+    } catch (error) {
+      setApprovalError(getRequestError(error, t));
+      setMascotPhase("idle");
+    } finally {
+      setApprovalBusy(false);
+    }
+  }
+
+  function updatePreferences(patch: Partial<KaelPreferences>) {
+    setPreferences((current) => ({ ...current, ...patch }));
+  }
+
+  function closeChangelog() {
+    playSfx("close");
+    setChangelogOpen(false);
+
+    try {
+      localStorage.setItem(KAEL_CHANGELOG_SEEN_KEY, KAEL_VERSION);
+    } catch {
+      // Storage can be unavailable; the changelog still closes.
+    }
+  }
+
+  function clearHistory() {
+    if (isThinking || approvalBusy) {
+      return;
+    }
+
+    discardApproval();
+    setSessions([]);
+    setMessages([]);
+    setActiveSessionId("");
+    setNextMessageId(1);
+    setStreamingId(null);
+    setInput("");
+    setAttachments([]);
+    setAttachmentError(null);
+    setMascotPhase("idle");
+    safeRemove(STORAGE_SESSIONS);
+    safeRemove(STORAGE_ACTIVE_SESSION);
+  }
+
+  function resetPreferences() {
+    setPreferences({ ...DEFAULT_PREFERENCES });
+    setSfxOn(true);
+    setSfxGlobal(true);
+    setAmbientOn(false);
+    setAmbientGlobal(false);
+    safeWrite(STORAGE_SFX, "true");
+    safeWrite(STORAGE_AMBIENT, "false");
+  }
+
+  const messageCount =
+    sessions.reduce((total, session) => total + session.messages.length, 0) +
+    (sessions.some((session) => session.id === activeSessionId)
+      ? 0
+      : messages.length);
+
   const lastUserMessage =
     messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
 
   return (
     <MotionConfig
-      reducedMotion="user"
+      reducedMotion={preferences.reduceMotion ? "always" : "user"}
       transition={{ type: "spring", stiffness: 260, damping: 27, mass: 0.9 }}
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-0 overflow-hidden"
-      >
-        <div
-          ref={ambientRef}
-          className="absolute inset-0 will-change-transform"
-        >
-          <div className="kael-orb kael-orb-ripe -right-40 -top-52 h-[36rem] w-[36rem]" />
-          <div className="kael-orb kael-orb-coral -left-48 top-[38%] h-[32rem] w-[32rem]" />
-          <div className="kael-orb kael-orb-violet -bottom-72 right-[22%] h-[34rem] w-[34rem]" />
-        </div>
-        <div className="kael-gradient-mesh absolute inset-0" />
-        <div className="kael-pointer-mesh absolute inset-0" />
-        <div className="kael-vignette absolute inset-0" />
-      </div>
-
-      <CursorGlow />
-
-      <ThreeBackground
-        enabled={threeEnabled}
-        quality={quality}
-        isThinking={isThinking}
-        hasMessages={messages.length > 0}
-        typingEnergy={typingEnergy}
+        className="pointer-events-none fixed inset-0 z-0 bg-[#0A0A0A]"
       />
 
       <main className="relative z-10 flex h-[100dvh] w-full overflow-hidden text-zinc-100">
@@ -1336,7 +1612,7 @@ export default function ChatPage() {
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="relative z-20 shrink-0 border-b border-white/[0.06] bg-[#07070a]/75 px-4 py-2.5 backdrop-blur-2xl sm:h-[72px] sm:px-6 sm:py-0 lg:px-8">
+          <header className="relative z-20 shrink-0 border-b border-[#262626] bg-[#0A0A0A]/85 px-4 py-2.5 backdrop-blur-2xl sm:h-[72px] sm:px-6 sm:py-0 lg:px-8">
             <div className="flex h-full flex-wrap items-center gap-x-3 gap-y-2 sm:flex-nowrap sm:gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-3 sm:flex-none">
               <button
@@ -1346,7 +1622,7 @@ export default function ChatPage() {
                   setMobileSidebarOpen(true);
                 }}
                 aria-label={t("header.openMenu")}
-                className="rounded-lg p-2.5 text-zinc-400 transition hover:bg-white/[0.05] hover:text-zinc-100 active:scale-95 lg:hidden"
+                className="rounded-lg p-2.5 text-zinc-400 transition hover:bg-[#1C1C1C] hover:text-zinc-100 active:scale-95 lg:hidden"
               >
                 <Menu size={20} strokeWidth={1.5} />
               </button>
@@ -1355,48 +1631,18 @@ export default function ChatPage() {
                 KAEL
               </span>
 
-              <span className="hidden h-4 w-px bg-white/[0.1] sm:block" />
+              <span className="hidden h-4 w-px bg-[#262626] sm:block" />
 
               <div className="hidden items-center gap-2 sm:flex">
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${
-                    isOnline ? "kael-pulse bg-[#f5576c]" : "bg-zinc-700"
+                    isOnline ? "kael-pulse bg-[#10B981]" : "bg-zinc-700"
                   }`}
                 />
                 <span className="text-sm text-zinc-500">
                   {isOnline ? t("app.online") : t("app.offline")}
                 </span>
               </div>
-            </div>
-
-            <div className="hidden shrink-0 items-center gap-2 sm:flex">
-              <button
-                type="button"
-                onClick={toggle3D}
-                aria-pressed={threeEnabled}
-                title={threeEnabled ? t("header.3dOff") : t("header.3dOn")}
-                className={`hidden h-10 shrink-0 items-center gap-2 rounded-xl border px-3 text-sm transition sm:inline-flex ${
-                  threeEnabled
-                    ? "border-[#f093fb]/30 bg-kael-gradient-soft text-zinc-100 hover:border-[#f093fb]/50"
-                    : "border-white/[0.08] text-zinc-500 hover:border-white/[0.16] hover:text-zinc-300"
-                }`}
-              >
-                <Layers size={16} strokeWidth={1.5} />
-                <span className="hidden sm:inline">3D</span>
-              </button>
-
-              <select
-                aria-label={t("header.quality")}
-                value={quality}
-                disabled={!threeEnabled}
-                onChange={(event) =>
-                  changeQuality(event.target.value as ThreeBackgroundQuality)
-                }
-                className="hidden h-10 shrink-0 cursor-pointer rounded-xl border border-white/[0.08] bg-[#07070a]/70 px-3 text-sm text-zinc-400 outline-none transition hover:border-white/[0.16] disabled:cursor-not-allowed disabled:opacity-40 md:block"
-              >
-                <option value="low">{t("header.qualityLow")}</option>
-                <option value="high">{t("header.qualityHigh")}</option>
-              </select>
             </div>
 
             <div className="order-last flex w-full min-w-0 items-center gap-2 sm:order-none sm:w-auto sm:flex-1 sm:justify-end">
@@ -1414,52 +1660,36 @@ export default function ChatPage() {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              <UserChip compact />
+              <div className="hidden sm:flex">
+                <UserChip compact />
+              </div>
 
               <LanguageSelector />
 
               <button
                 type="button"
-                onClick={toggleSfx}
-                aria-pressed={sfxOn}
-                aria-label={
-                  sfxOn ? t("header.sfxOff") : t("header.sfxOn")
-                }
-                title={
-                  sfxOn ? t("header.sfxEnabled") : t("header.sfxDisabled")
-                }
-                className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5576c]/35 ${
-                  sfxOn
-                    ? "border-[#f093fb]/25 bg-kael-gradient-soft text-zinc-200 hover:border-[#f093fb]/45"
-                    : "border-white/[0.08] text-zinc-500 hover:border-white/[0.16] hover:text-zinc-300"
-                }`}
+                onClick={() => {
+                  playSfx("open");
+                  setChangelogOpen(true);
+                }}
+                aria-label={t("changelog.open")}
+                title={`${t("changelog.open")} · ${KAEL_VERSION_LABEL}`}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#262626] text-zinc-400 transition hover:border-[#10B981]/45 hover:bg-[#1C1C1C] hover:text-zinc-100 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/40"
               >
-                {sfxOn ? (
-                  <Volume2 size={17} strokeWidth={1.7} />
-                ) : (
-                  <VolumeX size={17} strokeWidth={1.7} />
-                )}
+                <ScrollText size={17} strokeWidth={1.7} />
               </button>
 
               <button
                 type="button"
-                onClick={toggleAmbient}
-                aria-pressed={ambientOn}
-                aria-label={
-                  ambientOn ? t("header.ambientOff") : t("header.ambientOn")
-                }
-                title={
-                  ambientOn
-                    ? t("header.ambientEnabled")
-                    : t("header.ambientDisabled")
-                }
-                className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5576c]/35 ${
-                  ambientOn
-                    ? "border-[#f5576c]/30 bg-kael-gradient-soft text-zinc-200 hover:border-[#f5576c]/50"
-                    : "border-white/[0.08] text-zinc-500 hover:border-white/[0.16] hover:text-zinc-300"
-                }`}
+                onClick={() => {
+                  playSfx("open");
+                  setSettingsOpen(true);
+                }}
+                aria-label={t("settings.title")}
+                title={t("settings.title")}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#262626] text-zinc-400 transition hover:border-[#10B981]/45 hover:bg-[#1C1C1C] hover:text-zinc-100 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/40"
               >
-                <AudioLines size={17} strokeWidth={1.7} />
+                <Settings size={17} strokeWidth={1.7} />
               </button>
             </div>
             </div>
@@ -1469,7 +1699,14 @@ export default function ChatPage() {
             {messages.length === 0 ? (
               <LandingState
                 onPrompt={(prompt) => void sendMessage(prompt)}
+                onOpenChangelog={() => {
+                  playSfx("open");
+                  setChangelogOpen(true);
+                }}
                 disabled={isThinking}
+                reduceMotion={preferences.reduceMotion}
+                showDemo={preferences.liveDemo}
+                showQuickStart={preferences.quickStart}
               />
             ) : (
               <section
@@ -1498,9 +1735,22 @@ export default function ChatPage() {
                     </div>
                   )}
 
-                  <div ref={bottomRef} className="h-px w-full shrink-0" />
+                  <div ref={bottomRef} className="h-20 w-full shrink-0 sm:h-24" />
                 </div>
               </section>
+            )}
+
+            {pendingApproval && (
+              <div className="shrink-0 px-4 pb-1 sm:px-6">
+                <div className="mx-auto w-full max-w-3xl">
+                  <McpApprovalPanel
+                    requests={pendingApproval.requests}
+                    busy={approvalBusy}
+                    error={approvalError}
+                    onResolve={(decisions) => void resolveApproval(decisions)}
+                  />
+                </div>
+              </div>
             )}
 
             <Composer
@@ -1514,22 +1764,69 @@ export default function ChatPage() {
               onAddFiles={(files) => void addFiles(files)}
               onRemoveAttachment={removeAttachment}
               onDismissError={() => setAttachmentError(null)}
+              enterToSend={preferences.enterToSend}
+              mascot={
+                messages.length > 0 ? (
+                  <MascotCompanion
+                    phase={mascotPhase}
+                    answerMood={mascotMood}
+                    enabled={preferences.mascotEnabled}
+                    forceReduceMotion={preferences.reduceMotion}
+                  />
+                ) : null
+              }
             />
           </div>
         </div>
       </main>
 
+      <SettingsModal
+        open={settingsOpen}
+        preferences={preferences}
+        usage={usage}
+        sfxOn={sfxOn}
+        ambientOn={ambientOn}
+        sessionCount={sessions.length}
+        messageCount={messageCount}
+        providers={providers}
+        providersLoading={providersLoading}
+        modelId={modelId}
+        onRefreshProviders={() => void refreshProviders()}
+        onSelectModel={setModelId}
+        onClose={() => {
+          playSfx("close");
+          setSettingsOpen(false);
+        }}
+        onChangePreferences={updatePreferences}
+        onSfxChange={updateSfx}
+        onAmbientChange={updateAmbient}
+        onClearHistory={clearHistory}
+        onResetPreferences={resetPreferences}
+        onRestartTour={() => {
+          setSettingsOpen(false);
+          window.setTimeout(restartKaelTour, 180);
+        }}
+        onOpenChangelog={() => {
+          setSettingsOpen(false);
+          window.setTimeout(() => setChangelogOpen(true), 180);
+        }}
+        onOpenTiers={() => {
+          setSettingsOpen(false);
+          window.setTimeout(() => setTiersOpen(true), 180);
+        }}
+      />
+
       <TiersModal
         open={tiersOpen}
         usage={usage}
-        devMode={devMode}
+        role={role}
         onClose={() => {
           playSfx("close");
           setTiersOpen(false);
         }}
-        onSelectTier={selectTier}
-        onUnlockDev={unlockDev}
       />
+
+      <ChangelogModal open={changelogOpen} onClose={closeChangelog} />
 
       <ArtifactDrawer
         artifact={activeArtifact}

@@ -48,12 +48,12 @@ export default function LiveSandbox({
   }, [text.previewError]);
 
   return (
-    <div className="relative flex h-full min-h-0 w-full items-stretch justify-center overflow-hidden bg-[#050507] p-0 sm:p-3">
+    <div className="relative flex h-full min-h-0 w-full items-stretch justify-center overflow-hidden bg-[#0A0A0A] p-0 sm:p-3">
       <div
         className={`relative flex h-full min-h-0 w-full flex-col overflow-hidden transition-[width,border-radius,box-shadow] duration-300 ease-out ${
           isMobileFrame
-            ? "mx-auto w-[375px] max-w-full rounded-[26px] border border-white/15 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.9)]"
-            : "rounded-none border-0 sm:rounded-xl sm:border sm:border-white/10"
+            ? "mx-auto w-[375px] max-w-full rounded-[26px] border border-[#262626] shadow-[0_24px_80px_-24px_rgba(0,0,0,0.9)]"
+            : "rounded-none border-0 sm:rounded-xl sm:border sm:border-[#262626]"
         }`}
       >
         <iframe
@@ -71,12 +71,12 @@ export default function LiveSandbox({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 flex items-center justify-center bg-[#030305]/90"
+              className="absolute inset-0 flex items-center justify-center bg-[#0A0A0A]/90"
             >
-              <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-zinc-400">
+              <span className="flex items-center gap-2 rounded-full border border-[#262626] bg-[#1C1C1C] px-4 py-2 text-sm text-zinc-400">
                 <Loader2
                   size={16}
-                  className="animate-spin text-[#f7a6ba]"
+                  className="animate-spin text-[#34D399]"
                 />
                 {text.loading}
               </span>
@@ -108,7 +108,7 @@ export default function LiveSandbox({
                 type="button"
                 onClick={() => setError(null)}
                 aria-label={text.dismiss}
-                className="rounded-lg p-1.5 text-red-200/70 transition hover:bg-white/[0.06] hover:text-white"
+                className="rounded-lg p-1.5 text-red-200/70 transition hover:bg-[#1C1C1C] hover:text-white"
               >
                 <X size={16} />
               </button>

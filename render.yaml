@@ -11,24 +11,37 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: KAEL_ENV
+        value: production
+      - key: KAEL_SECRET_KEY
+        generateValue: true
+      - key: KAEL_TRUST_PROXY_HEADERS
+        value: "1"
+      # Render sits behind Cloudflare: the rightmost X-Forwarded-For entry is
+      # the Render edge, so the client IP is one entry further left.
+      - key: KAEL_XFF_TRUSTED_ENTRIES
+        value: "1"
+      - key: KAEL_MCP_ALLOW_LOCAL
+        value: "0"
+      - key: KAEL_PUBLIC_FRONTEND_URL
+        value: https://kael-ai.ct.ws
+      - key: KAEL_ALLOWED_ORIGINS
+        value: https://kael-ai.ct.ws
+      - key: CLERK_AUTHORIZED_PARTIES
+        value: https://kael-ai.ct.ws
+      - key: OPENROUTER_HTTP_REFERER
+        value: https://kael-ai.ct.ws
       - key: OPENROUTER_APP_NAME
         value: KAEL
+      # The OAuth callback falls back to RENDER_EXTERNAL_URL. Set
+      # KAEL_PUBLIC_API_URL manually only when using a custom backend domain.
+      - key: CLERK_ISSUER
+        sync: false
       - key: OPENROUTER_API_KEY
         sync: false
       - key: GROQ_API_KEY
         sync: false
-      - key: TELEGRAM_BOT_TOKEN
+      - key: ZEROCAT_API_KEY
         sync: false
-      - key: KAEL_JWT_SECRET
-        sync: false
-      # Optional comma-separated Telegram user IDs for a closed beta.
-      - key: KAEL_ALLOWED_TG_IDS
-        sync: false
-      - key: TELEGRAM_WEBHOOK_SECRET
-        sync: false
-      - key: KAEL_DEV_SECRET
-        sync: false
-      - key: KAEL_ALLOWED_ORIGINS
-        sync: false
-      - key: OPENROUTER_HTTP_REFERER
+      - key: GEMINI_API_KEY
         sync: false

@@ -18,8 +18,8 @@ export type UsageState = {
 };
 
 export const DEV_TIER_ID: TierId = "dev";
-export const DEV_MODE_STORAGE_KEY = "kael_dev_mode";
-export const DEV_SECRET = "kael-dev-2026";
+
+export type AccessRole = "admin" | "tester" | "user";
 
 export const TIERS: Tier[] = [
   {
@@ -92,28 +92,15 @@ export function isUnlimitedTier(tier: Tier): boolean {
   return tier.id === DEV_TIER_ID || tier.tokenLimit <= 0;
 }
 
-export function readDevMode(): boolean {
-  if (typeof window === "undefined") {
-    return false;
+/** Server role determines the visible tier; the client never chooses it. */
+export function tierForRole(role: AccessRole): TierId {
+  if (role === "admin") {
+    return "dev";
   }
-
-  try {
-    return window.localStorage.getItem(DEV_MODE_STORAGE_KEY) === "true";
-  } catch {
-    return false;
+  if (role === "tester") {
+    return "elite";
   }
-}
-
-export function writeDevMode(enabled: boolean): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(DEV_MODE_STORAGE_KEY, String(enabled));
-  } catch {
-    return;
-  }
+  return "free";
 }
 
 export function currentPeriod(now = new Date()): string {
@@ -162,13 +149,9 @@ export function readUsage(): UsageState {
     }
 
     const period = currentPeriod();
-    const tierId =
-      parsed.tierId === DEV_TIER_ID && !readDevMode()
-        ? DEFAULT_TIER_ID
-        : parsed.tierId;
 
     return {
-      tierId,
+      tierId: parsed.tierId,
       tokensUsed:
         parsed.period === period
           ? Math.max(0, Math.round(parsed.tokensUsed))

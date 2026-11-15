@@ -9,31 +9,25 @@ const config: Config = {
     extend: {
       colors: {
         kael: {
-          background: "#050507",
-          surface: "#07070a",
-          panel: "#0d0d12",
-          border: "rgba(255, 255, 255, 0.08)",
-          pink: "#f093fb",
-          coral: "#f5576c",
-          accent: "#f7a6ba",
+          bg: "var(--kael-bg)",
+          surface: "var(--kael-surface)",
+          raised: "var(--kael-raised)",
+          border: "var(--kael-border)",
+          text: "var(--kael-text)",
+          muted: "var(--kael-muted)",
+          accent: "var(--kael-accent)",
+          "accent-strong": "var(--kael-accent-strong)",
+          "accent-ink": "var(--kael-accent-ink)",
         },
       },
       fontFamily: {
-        display: ["var(--font-display)", "Arial", "sans-serif"],
-        sans: ["var(--font-interface)", "Segoe UI", "sans-serif"],
+        display: ["var(--font-display-active)", "Arial", "sans-serif"],
+        sans: ["var(--font-interface-active)", "Segoe UI", "sans-serif"],
         mono: ["var(--font-mono)", "Consolas", "monospace"],
       },
-      backgroundImage: {
-        "kael-gradient":
-          "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
-        "kael-gradient-soft":
-          "linear-gradient(135deg, rgba(240,147,251,0.16) 0%, rgba(245,87,108,0.14) 100%)",
-      },
       boxShadow: {
-        "kael-glow":
-          "0 24px 70px -30px rgba(0, 0, 0, 0.95), 0 0 60px -24px rgba(245, 87, 108, 0.35)",
-        "kael-accent":
-          "0 16px 44px -18px rgba(245, 87, 108, 0.6), 0 0 40px -20px rgba(240, 147, 251, 0.5)",
+        card: "0 24px 64px -24px rgba(0, 0, 0, 0.9)",
+        "accent-line": "inset 0 1px 0 0 rgba(16, 185, 129, 0.35)",
       },
     },
   },

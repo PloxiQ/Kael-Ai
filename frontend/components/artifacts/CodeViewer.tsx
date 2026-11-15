@@ -29,14 +29,14 @@ const TOKEN_CLASS: Record<TokenType, string> = {
   comment: "text-zinc-500 italic",
   string: "text-emerald-300/90",
   number: "text-amber-200/90",
-  keyword: "text-[#f7a6ba]",
-  tag: "text-[#f093fb]",
+  keyword: "text-[#34D399]",
+  tag: "text-[#10B981]",
   attr: "text-[#f7c6a6]",
   function: "text-sky-300/90",
   operator: "text-zinc-400",
   punctuation: "text-zinc-500",
-  property: "text-[#f7a6ba]",
-  heading: "text-[#f7a6ba] font-semibold",
+  property: "text-[#34D399]",
+  heading: "text-[#34D399] font-semibold",
   link: "text-sky-300 underline decoration-sky-300/40 underline-offset-2",
   emphasis: "text-zinc-200 italic",
 };
@@ -332,7 +332,7 @@ export default function CodeViewer({
   if (!content.trim()) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] text-zinc-500">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#262626] bg-[#1C1C1C] text-zinc-500">
           <Braces size={22} strokeWidth={1.5} />
         </span>
         <p className="text-sm text-zinc-500">{text.empty}</p>
@@ -342,18 +342,18 @@ export default function CodeViewer({
 
   return (
     <div
-      className="h-full overflow-auto scroll-smooth bg-[#030305]"
+      className="h-full overflow-auto scroll-smooth bg-[#0A0A0A]"
       aria-label={text.code}
     >
       <pre className="min-w-max py-4 font-mono text-sm leading-6">
         {lines.map((line, lineIndex) => (
           <div
             key={lineIndex}
-            className="flex min-h-6 min-w-full hover:bg-white/[0.025]"
+            className="flex min-h-6 min-w-full hover:bg-[#1C1C1C]"
           >
             <span
               aria-hidden="true"
-              className="sticky left-0 z-10 w-14 shrink-0 select-none border-r border-white/[0.06] bg-[#030305] pr-3 text-right text-zinc-600"
+              className="sticky left-0 z-10 w-14 shrink-0 select-none border-r border-[#262626] bg-[#0A0A0A] pr-3 text-right text-zinc-600"
             >
               {lineIndex + 1}
             </span>

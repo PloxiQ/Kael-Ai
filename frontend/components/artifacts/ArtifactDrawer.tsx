@@ -44,9 +44,9 @@ function MarkdownPreviewFallback() {
   const text = artifactText(language);
 
   return (
-    <div className="flex h-full items-center justify-center bg-[#050507]">
-      <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-zinc-400">
-        <Loader2 size={16} className="animate-spin text-[#f7a6ba]" />
+    <div className="flex h-full items-center justify-center bg-[#0A0A0A]">
+      <span className="flex items-center gap-2 rounded-full border border-[#262626] bg-[#1C1C1C] px-4 py-2 text-sm text-zinc-400">
+        <Loader2 size={16} className="animate-spin text-[#34D399]" />
         {text.loading}
       </span>
     </div>
@@ -264,12 +264,12 @@ export default function ArtifactDrawer({
               damping: 32,
               mass: 0.9,
             }}
-            className="pointer-events-auto absolute inset-y-0 right-0 z-10 flex h-[100dvh] w-full flex-col overflow-hidden rounded-t-[26px] border border-white/10 bg-[#030305]/95 shadow-[0_0_120px_-30px_rgba(240,147,251,0.4),0_40px_120px_-40px_rgba(0,0,0,0.95)] backdrop-blur-2xl lg:w-1/2 lg:rounded-none lg:rounded-l-[26px]"
+            className="pointer-events-auto absolute inset-y-0 right-0 z-10 flex h-[100dvh] w-full flex-col overflow-hidden rounded-t-[26px] border border-[#262626] bg-[#0A0A0A]/95 shadow-[0_40px_120px_-40px_rgba(0,0,0,0.95)] backdrop-blur-2xl lg:w-1/2 lg:rounded-none lg:rounded-l-[26px]"
           >
-            <header className="shrink-0 border-b border-white/[0.08] px-4 pb-3 pt-4 sm:px-5">
+            <header className="shrink-0 border-b border-[#262626] px-4 pb-3 pt-4 sm:px-5">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#f093fb]/25 bg-kael-gradient-soft text-[#f7a6ba]">
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#10B981]/25 bg-[#10B981]/10 text-[#34D399]">
                     <FileCode2 size={19} strokeWidth={1.5} />
                   </span>
 
@@ -284,7 +284,7 @@ export default function ArtifactDrawer({
                       {displayArtifact.title || text.untitled}
                     </h2>
                     <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-500">
-                      <span className="inline-flex min-h-6 items-center rounded-full border border-[#f093fb]/20 bg-kael-gradient-soft px-2.5 font-medium text-[#f7a6ba]">
+                      <span className="inline-flex min-h-6 items-center rounded-full border border-[#10B981]/20 bg-[#10B981]/10 px-2.5 font-medium text-[#34D399]">
                         {text.types[displayArtifact.type]}
                       </span>
                       <span className="font-mono text-zinc-400">
@@ -304,7 +304,7 @@ export default function ArtifactDrawer({
                   onClick={onClose}
                   aria-label={text.close}
                   title={text.close}
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-zinc-400 transition hover:border-white/[0.18] hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5576c]/45"
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#262626] bg-[#1C1C1C] text-zinc-400 transition hover:border-[#3A3A3A] hover:bg-[#1C1C1C] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/45"
                 >
                   <X size={18} strokeWidth={1.7} />
                 </button>
@@ -312,7 +312,7 @@ export default function ArtifactDrawer({
             </header>
 
             {previewable && (
-              <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.08] px-3 pt-2">
+              <div className="flex shrink-0 items-center gap-1 border-b border-[#262626] px-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setTab("preview")}
@@ -328,7 +328,7 @@ export default function ArtifactDrawer({
                   {activeTab === "preview" && (
                     <motion.span
                       layoutId="artifact-active-tab"
-                      className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-kael-gradient"
+                      className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-[#10B981]"
                     />
                   )}
                 </button>
@@ -348,19 +348,19 @@ export default function ArtifactDrawer({
                   {activeTab === "code" && (
                     <motion.span
                       layoutId="artifact-active-tab"
-                      className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-kael-gradient"
+                      className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-[#10B981]"
                     />
                   )}
                 </button>
               </div>
             )}
 
-            <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-white/[0.08] px-3 py-2.5">
+            <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[#262626] px-3 py-2.5">
               {activeTab === "preview" && previewable && (
                 <div
                   role="group"
                   aria-label={text.viewport}
-                  className="flex rounded-xl border border-white/10 bg-white/[0.03] p-1"
+                  className="flex rounded-xl border border-[#262626] bg-[#1C1C1C] p-1"
                 >
                   <button
                     type="button"
@@ -369,7 +369,7 @@ export default function ArtifactDrawer({
                     title={text.desktop}
                     className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-2.5 text-sm transition ${
                       device === "desktop"
-                        ? "bg-kael-gradient-soft text-[#f7a6ba]"
+                        ? "bg-[#10B981]/10 text-[#34D399]"
                         : "text-zinc-500 hover:text-zinc-300"
                     }`}
                   >
@@ -385,7 +385,7 @@ export default function ArtifactDrawer({
                     title={text.mobile}
                     className={`inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-2.5 text-sm transition ${
                       device === "mobile"
-                        ? "bg-kael-gradient-soft text-[#f7a6ba]"
+                        ? "bg-[#10B981]/10 text-[#34D399]"
                         : "text-zinc-500 hover:text-zinc-300"
                     }`}
                   >
@@ -401,13 +401,13 @@ export default function ArtifactDrawer({
                 <button
                   type="button"
                   onClick={() => void handleCopy()}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm text-zinc-300 transition hover:border-[#f093fb]/35 hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5576c]/45"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#262626] bg-[#1C1C1C] px-3 text-sm text-zinc-300 transition hover:border-[#10B981]/35 hover:bg-[#1C1C1C] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/45"
                 >
                   {copyState === "copied" ? (
                     <Check
                       size={16}
                       strokeWidth={1.8}
-                      className="text-[#f7a6ba]"
+                      className="text-[#34D399]"
                     />
                   ) : copyState === "failed" ? (
                     <X
@@ -430,7 +430,7 @@ export default function ArtifactDrawer({
                 <button
                   type="button"
                   onClick={handleDownload}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm text-zinc-300 transition hover:border-[#f093fb]/35 hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5576c]/45"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#262626] bg-[#1C1C1C] px-3 text-sm text-zinc-300 transition hover:border-[#10B981]/35 hover:bg-[#1C1C1C] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/45"
                 >
                   <Download size={16} strokeWidth={1.7} />
                   <span>{text.download}</span>
@@ -439,7 +439,7 @@ export default function ArtifactDrawer({
                 <button
                   type="button"
                   onClick={handleOpenTab}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-sm text-zinc-300 transition hover:border-[#f093fb]/35 hover:bg-white/[0.06] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5576c]/45"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#262626] bg-[#1C1C1C] px-3 text-sm text-zinc-300 transition hover:border-[#10B981]/35 hover:bg-[#1C1C1C] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/45"
                 >
                   <ExternalLink size={16} strokeWidth={1.7} />
                   <span>{text.openTab}</span>
@@ -468,12 +468,12 @@ export default function ArtifactDrawer({
               )}
             </div>
 
-            <footer className="shrink-0 border-t border-white/[0.08] px-4 py-2.5">
+            <footer className="shrink-0 border-t border-[#262626] px-4 py-2.5">
               <span className="inline-flex items-center gap-2 text-sm text-zinc-500">
                 <ShieldCheck
                   size={15}
                   strokeWidth={1.7}
-                  className="text-[#f7a6ba]"
+                  className="text-[#34D399]"
                 />
                 {displayArtifact.type === "markdown"
                   ? text.safePreview

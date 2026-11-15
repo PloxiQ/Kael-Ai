@@ -1,7 +1,5 @@
 "use client";
 
-import { useId } from "react";
-
 type Look = "center" | "up" | "down" | "left" | "right";
 
 const OFFSET: Record<Look, [number, number]> = {
@@ -21,7 +19,7 @@ type Props = {
   className?: string;
 };
 
-/** Spark, KAEL's mascot: a glowing robot orb with an antenna. */
+/** Spark, KAEL's placeholder mascot: a small robot orb with an antenna. */
 export function KaelMascot({
   size = 80,
   look = "center",
@@ -29,7 +27,6 @@ export function KaelMascot({
   float = true,
   className = "",
 }: Props) {
-  const uid = useId().replace(/:/g, "");
   const [dx, dy] = OFFSET[look];
 
   return (
@@ -39,30 +36,22 @@ export function KaelMascot({
       viewBox="0 0 100 100"
       aria-hidden="true"
       className={`${float ? "kael-float" : ""} ${className}`}
-      style={{ filter: "drop-shadow(0 0 10px rgba(245,87,108,0.6))" }}
     >
-      <defs>
-        <linearGradient id={`body-${uid}`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#f472b6" />
-          <stop offset="1" stopColor="#a855f7" />
-        </linearGradient>
-      </defs>
-
-      <ellipse cx="50" cy="92" rx="22" ry="3" fill="#f5576c" opacity="0.3" />
+      <ellipse cx="50" cy="92" rx="22" ry="3" fill="#10B981" opacity="0.3" />
 
       <line
         x1="50"
         y1="19"
         x2="50"
         y2="9"
-        stroke="#f0abfc"
+        stroke="#34D399"
         strokeWidth="2.5"
         strokeLinecap="round"
       />
-      <circle className="kael-antenna" cx="50" cy="7" r="4" fill="#f9a8d4" />
+      <circle className="kael-antenna" cx="50" cy="7" r="4" fill="#34D399" />
 
-      <rect x="7" y="41" width="8" height="18" rx="3.5" fill="#c084fc" />
-      <rect x="85" y="41" width="8" height="18" rx="3.5" fill="#c084fc" />
+      <rect x="7" y="41" width="8" height="18" rx="3.5" fill="#047857" />
+      <rect x="85" y="41" width="8" height="18" rx="3.5" fill="#047857" />
 
       <rect
         x="13"
@@ -70,7 +59,7 @@ export function KaelMascot({
         width="74"
         height="66"
         rx="30"
-        fill={`url(#body-${uid})`}
+        fill="#10B981"
       />
       <path
         d="M26 30 Q34 22 48 22"
@@ -87,8 +76,8 @@ export function KaelMascot({
         width="56"
         height="38"
         rx="17"
-        fill="#0b0614"
-        stroke="#f0abfc"
+        fill="#0A0A0A"
+        stroke="#34D399"
         strokeOpacity="0.5"
         strokeWidth="1.5"
       />
@@ -99,14 +88,14 @@ export function KaelMascot({
             <>
               <path
                 d="M31 55 Q37 47 43 55"
-                stroke="#f5d0fe"
+                stroke="#F5F5F0"
                 strokeWidth="3.5"
                 strokeLinecap="round"
                 fill="none"
               />
               <path
                 d="M57 55 Q63 47 69 55"
-                stroke="#f5d0fe"
+                stroke="#F5F5F0"
                 strokeWidth="3.5"
                 strokeLinecap="round"
                 fill="none"
@@ -114,8 +103,8 @@ export function KaelMascot({
             </>
           ) : (
             <>
-              <circle cx="37" cy="51" r="6.5" fill="#f5d0fe" />
-              <circle cx="63" cy="51" r="6.5" fill="#f5d0fe" />
+              <circle cx="37" cy="51" r="6.5" fill="#F5F5F0" />
+              <circle cx="63" cy="51" r="6.5" fill="#F5F5F0" />
               <circle cx="38.5" cy="49.5" r="2" fill="#fff" />
               <circle cx="64.5" cy="49.5" r="2" fill="#fff" />
             </>
@@ -125,7 +114,7 @@ export function KaelMascot({
 
       <path
         d="M45 63 Q50 67 55 63"
-        stroke="#f472b6"
+        stroke="#34D399"
         strokeWidth="2"
         strokeLinecap="round"
         fill="none"

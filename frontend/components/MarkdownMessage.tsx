@@ -36,16 +36,16 @@ function CodeBlock({
   }
 
   return (
-    <div className="my-5 overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07070a]/85">
-      <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-5 py-3">
+    <div className="my-5 overflow-hidden rounded-2xl border border-[#262626] bg-[#161616]/85">
+      <div className="flex items-center justify-between gap-3 border-b border-[#262626] px-5 py-3">
         <span className="text-sm text-zinc-500">{language}</span>
         <button
           type="button"
           onClick={() => void copyCode()}
-          className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-zinc-400 transition hover:bg-white/[0.05] hover:text-white"
+          className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm text-zinc-400 transition hover:bg-[#1C1C1C] hover:text-white"
         >
           {copyState === "copied" ? (
-            <Check size={15} strokeWidth={1.6} className="text-[#f7a6ba]" />
+            <Check size={15} strokeWidth={1.6} className="text-[#34D399]" />
           ) : copyState === "failed" ? (
             <X size={15} strokeWidth={1.6} className="text-red-400" />
           ) : (
@@ -84,7 +84,7 @@ const markdownComponents: Components = {
     }
 
     return (
-      <code className="rounded-md border border-white/[0.07] bg-white/[0.06] px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">
+      <code className="rounded-md border border-[#262626] bg-[#1C1C1C] px-1.5 py-0.5 font-mono text-[0.9em] text-zinc-100">
         {children}
       </code>
     );
@@ -139,19 +139,23 @@ const markdownComponents: Components = {
   },
   blockquote({ children }) {
     return (
-      <blockquote className="my-5 rounded-r-xl border-l-2 border-[#f5576c]/60 bg-kael-gradient-soft py-2 pl-5 pr-4 text-zinc-300">
+      <blockquote className="my-5 rounded-r-xl border-l-2 border-[#10B981]/60 bg-[#10B981]/10 py-2 pl-5 pr-4 text-zinc-300">
         {children}
       </blockquote>
     );
   },
   a({ children, href, title }) {
+    const external =
+      typeof href === "string" && /^https?:\/\//i.test(href);
+
     return (
       <a
         href={href}
         title={title}
-        target="_blank"
-        rel="noreferrer"
-        className="text-[#f7a6ba] underline decoration-[#f5576c]/40 underline-offset-4 transition hover:text-white"
+        {...(external
+          ? { target: "_blank", rel: "noopener noreferrer" }
+          : {})}
+        className="text-[#34D399] underline decoration-[#10B981]/40 underline-offset-4 transition hover:text-white"
       >
         {children}
       </a>
@@ -162,7 +166,7 @@ const markdownComponents: Components = {
   },
   table({ children }) {
     return (
-      <div className="my-5 overflow-x-auto rounded-xl border border-white/[0.08]">
+      <div className="my-5 overflow-x-auto rounded-xl border border-[#262626]">
         <table className="w-full border-collapse text-left">{children}</table>
       </div>
     );
@@ -181,7 +185,7 @@ const markdownComponents: Components = {
         title={title}
         loading="lazy"
         referrerPolicy="no-referrer"
-        className="my-5 max-h-[440px] max-w-full rounded-2xl border border-white/[0.08] object-contain"
+        className="my-5 max-h-[440px] max-w-full rounded-2xl border border-[#262626] object-contain"
       />
     );
   },

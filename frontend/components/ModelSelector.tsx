@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Cloud, Cpu, Zap } from "lucide-react";
+import { Boxes, Check, ChevronDown, Cloud, Cpu, Gem, Zap } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "../lib/i18n";
@@ -26,6 +26,8 @@ const PROVIDER_ICONS: Record<ProviderId, typeof Cloud> = {
   openrouter: Cloud,
   groq: Zap,
   ollama: Cpu,
+  zerocat: Boxes,
+  gemini: Gem,
 };
 
 const MODEL_INDEX = new Map(
@@ -183,9 +185,9 @@ export default function ModelSelector({
             : t("model.selectAria")
         }
         title={selectedModel?.id}
-        className="flex h-10 w-full max-w-none min-w-0 items-center gap-2 rounded-xl border border-white/10 bg-[#07070a]/80 px-3 text-sm text-zinc-200 backdrop-blur-xl transition-all hover:border-[#f5576c]/50 focus-visible:border-[#f5576c]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5576c]/30 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:max-w-[220px]"
+        className="flex h-10 w-full max-w-none min-w-0 items-center gap-2 rounded-xl border border-[#262626] bg-[#161616]/80 px-3 text-sm text-zinc-200 backdrop-blur-xl transition-all hover:border-[#10B981]/50 focus-visible:border-[#10B981]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/30 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:max-w-[220px]"
       >
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-kael-gradient shadow-[0_0_10px_rgba(245,87,108,0.5)]" />
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#10B981] shadow-none" />
         <span className="min-w-0 flex-1 truncate text-left">
           {selectedModel?.name ?? t("model.fallback")}
         </span>
@@ -209,11 +211,11 @@ export default function ModelSelector({
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 380, damping: 30, mass: 0.7 }}
             style={{ transformOrigin: "top right" }}
-            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 max-h-[min(78vh,640px)] w-[min(86vw,340px)] overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[#07070a]/95 p-2 shadow-[0_30px_90px_-28px_rgba(0,0,0,0.96),0_0_60px_-30px_rgba(245,87,108,0.45)] backdrop-blur-xl"
+            className="absolute right-0 top-[calc(100%+0.5rem)] z-50 max-h-[min(78vh,640px)] w-[min(86vw,340px)] overflow-y-auto overscroll-contain rounded-2xl border border-[#262626] bg-[#161616]/95 p-2 shadow-[0_30px_90px_-28px_rgba(0,0,0,0.96)] backdrop-blur-xl"
           >
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-[#f093fb]/65 to-transparent"
+            className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-[#10B981]/65 to-transparent"
           />
 
           {MODEL_GROUPS.map((group) => {
@@ -231,7 +233,7 @@ export default function ModelSelector({
                   <Icon
                     size={14}
                     strokeWidth={1.6}
-                    className="shrink-0 text-[#f7a6ba]"
+                    className="shrink-0 text-[#34D399]"
                   />
                   <span
                     id={headingId}
@@ -262,16 +264,16 @@ export default function ModelSelector({
                         title={`${group.label} · ${model.id}`}
                         onMouseEnter={() => setHighlighted(index)}
                         onClick={() => selectModel(model)}
-                        className={`relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition focus:outline-none focus-visible:bg-white/[0.07] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#f5576c]/35 ${
+                        className={`relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition focus:outline-none focus-visible:bg-[#1C1C1C] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#10B981]/35 ${
                           active
-                            ? "bg-kael-gradient-soft"
+                            ? "bg-[#10B981]/10"
                             : current
-                              ? "bg-white/[0.05]"
-                              : "hover:bg-white/[0.035]"
+                              ? "bg-[#1C1C1C]"
+                              : "hover:bg-[#1C1C1C]"
                         }`}
                       >
                         {active && (
-                          <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-kael-gradient" />
+                          <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-[#10B981]" />
                         )}
 
                         <span className="min-w-0 flex-1">
@@ -290,13 +292,13 @@ export default function ModelSelector({
                         </span>
 
                         {active ? (
-                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/[0.06] text-[#f7a6ba]">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#1C1C1C] text-[#34D399]">
                             <Check size={14} strokeWidth={2} />
                           </span>
                         ) : (
                           <span
                             className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                              current ? "bg-[#f5576c]" : "bg-white/10"
+                              current ? "bg-[#10B981]" : "bg-[#262626]"
                             }`}
                           />
                         )}

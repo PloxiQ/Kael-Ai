@@ -1,6 +1,33 @@
-/** Fetch helpers for the KAEL FastAPI backend and Telegram session token. */
+/** Fetch helpers for the KAEL FastAPI backend and Clerk session tokens. */
 
-export const TOKEN_STORAGE_KEY = "kael_token";
+import {
+  getAuthToken,
+  notifyAuthUnauthorized,
+} from "./authToken";
+
+export type KaelRole = "admin" | "tester" | "user";
+
+export type MeResponse = {
+  id: string;
+  role: KaelRole;
+  email: string | null;
+  name: string | null;
+  dev_access: boolean;
+};
+
+/** Provider availability, so the client can avoid a model with a missing key. */
+export type ProvidersResponse = {
+  openrouter: boolean;
+  groq: boolean;
+  ollama: boolean;
+  zerocat: boolean;
+  gemini: boolean;
+};
+
+export type AuthFetchOptions = {
+  /** Use an already fetched token instead of the registered getter. */
+  token?: string | null;
+};
 
 export function apiUrl(path: string): string {
   const base = (process.env.NEXT_PUBLIC_KAEL_API_URL ?? "").replace(
@@ -13,33 +40,92 @@ export function apiUrl(path: string): string {
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-/** fetch with the Bearer token issued after Telegram initData verification. */
-export async function authFetch(path: string, init: RequestInit = {}) {
-  let token: string | null = null;
-  try {
-    token = localStorage.getItem(TOKEN_STORAGE_KEY);
-  } catch {
-    token = null;
+export function isMeResponse(value: unknown): value is MeResponse {
+  if (typeof value !== "object" || value === null) {
+    return false;
   }
 
-  const response = await fetch(apiUrl(path), {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+  const candidate = value as Partial<MeResponse>;
 
-  // The 7-day session expired or the secret changed. Drop the stale token so
-  // the provider can log in again with fresh initData after the reload.
-  if (response.status === 401) {
-    try {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
-    } catch {
-      // Storage can be unavailable in private mode; the reload still recovers.
+  return (
+    typeof candidate.id === "string" &&
+    (candidate.role === "admin" ||
+      candidate.role === "tester" ||
+      candidate.role === "user") &&
+    (candidate.email === null || typeof candidate.email === "string") &&
+    (candidate.name === null || typeof candidate.name === "string") &&
+    typeof candidate.dev_access === "boolean"
+  );
+}
+
+export function isProvidersResponse(
+  value: unknown,
+): value is ProvidersResponse {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const candidate = value as Partial<ProvidersResponse>;
+
+  return (
+    typeof candidate.openrouter === "boolean" &&
+    typeof candidate.groq === "boolean" &&
+    typeof candidate.ollama === "boolean" &&
+    typeof candidate.zerocat === "boolean" &&
+    typeof candidate.gemini === "boolean"
+  );
+}
+
+function buildHeaders(init: RequestInit, token: string | null): Headers {
+  const headers = new Headers(init.headers);
+
+  if (!headers.has("Content-Type")) {
+    const isFormData =
+      typeof FormData !== "undefined" && init.body instanceof FormData;
+    if (!isFormData) {
+      headers.set("Content-Type", "application/json");
     }
-    window.location.reload();
+  }
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  return headers;
+}
+
+/**
+ * fetch with a Clerk session token. On the first 401 the token cache is
+ * bypassed once, then the registered handler signs the stale session out.
+ */
+export async function authFetch(
+  path: string,
+  init: RequestInit = {},
+  options: AuthFetchOptions = {},
+): Promise<Response> {
+  const send = (token: string | null) =>
+    fetch(apiUrl(path), {
+      ...init,
+      headers: buildHeaders(init, token),
+    });
+
+  const usesExplicitToken = options.token !== undefined;
+  let token = usesExplicitToken
+    ? options.token ?? null
+    : await getAuthToken();
+
+  let response = await send(token);
+
+  if (response.status === 401 && !usesExplicitToken) {
+    const freshToken = await getAuthToken({ skipCache: true });
+    if (freshToken && freshToken !== token) {
+      token = freshToken;
+      response = await send(token);
+    }
+  }
+
+  if (response.status === 401 && !usesExplicitToken) {
+    notifyAuthUnauthorized();
   }
 
   return response;

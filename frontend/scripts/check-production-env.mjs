@@ -112,12 +112,24 @@ if (parsed.pathname !== "/" || parsed.search || parsed.hash) {
   );
 }
 
-const botUsername = env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME?.trim() ?? "";
-if (!botUsername) {
+const clerkKey = env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.trim() ?? "";
+if (!clerkKey) {
   console.warn(
-    "[KAEL build check] NEXT_PUBLIC_TELEGRAM_BOT_USERNAME is empty. " +
-      "The login screen will explain Telegram-only access but will not show " +
-      "an 'Open in Telegram' button.",
+    "[KAEL build check] NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is empty. " +
+      "The app will build, but show a Clerk setup screen instead of sign-in.",
+  );
+} else if (!/^pk_(test|live)_/.test(clerkKey)) {
+  fail(
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY must start with pk_test_ or pk_live_.",
+  );
+} else if (clerkKey.startsWith("pk_test_") && !allowLocal) {
+  // A development instance only accepts the origins listed in its Clerk
+  // Dashboard and shows a development badge. Shipping it to the real domain
+  // is usually a mistake, but it is allowed so staging builds still work.
+  console.warn(
+    "[KAEL build check] Building with a Clerk development key (pk_test_...). " +
+      "Sign-in will only work on origins allowed by that development " +
+      "instance. Use a pk_live_ key for the production domain.",
   );
 }
 

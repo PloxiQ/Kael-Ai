@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "../lib/i18n";
 import type { ResponseMode } from "../lib/modes";
 import {
@@ -15,11 +15,31 @@ export type ThinkingStep = {
   completed: boolean;
 };
 
-type ThinkingStatusProps = {
+export type ThinkingStatusProps = {
+  /** True while the model is working; false renders the finished summary. */
   isThinking: boolean;
+  /** Last user message. Used to pick a scenario for the auto-generated statuses. */
   userMessage?: string;
+  /** Total time of the finished answer, shown in the finished state. */
   durationMs?: number;
   mode?: ResponseMode;
+  /** Custom rotating statuses, e.g. ["Думает...", "Анализирует код..."]. Overrides the generated ones. */
+  statuses?: string[];
+  /** Fully controlled label. When set, the internal timer does not rotate statuses. */
+  status?: string;
+  /** Milliseconds between status changes. Defaults depend on `mode`. */
+  intervalMs?: number;
+  /** Start over from the first status after the last one instead of stopping on it. */
+  loop?: boolean;
+  /** Open the steps list initially. */
+  defaultExpanded?: boolean;
+  /** Hide the chevron and the steps list (pure one-line indicator). */
+  hideSteps?: boolean;
+  /** Show the elapsed time (m:ss) while thinking. Default true. */
+  showTimer?: boolean;
+  /** Fires whenever the visible status changes, e.g. to sync the mascot's speech. */
+  onStepChange?: (index: number, label: string) => void;
+  className?: string;
 };
 
 export type ThinkingScenario =
@@ -268,39 +288,204 @@ export function buildThinkingSteps(
   }));
 }
 
+const STYLES = `
+.kts-lattice{display:grid;grid-template-columns:repeat(3,5px);gap:3px;transform:rotate(45deg)}
+.kts-lattice i{display:block;width:5px;height:5px;border-radius:1.5px;background:var(--kael-border);animation:kts-wave 1.6s ease-in-out infinite}
+.kts-orb{position:absolute;inset:2px;border-radius:9999px;background:radial-gradient(circle,rgb(var(--kael-accent-rgb) / .22),transparent 68%);filter:blur(5px);animation:kts-breathe 1.6s ease-in-out infinite}
+.kts-check circle,.kts-check path{stroke-dasharray:1;stroke-dashoffset:1;animation:kts-draw .55s ease-out forwards}
+.kts-check path{animation-delay:.12s}
+.kts-in{animation:kts-in .4s cubic-bezier(.2,.7,.2,1) both}
+.kts-out{animation:kts-out .3s ease-in both;pointer-events:none}
+.kts-shimmer{background:linear-gradient(100deg,var(--kael-muted) 38%,var(--kael-accent-strong) 50%,var(--kael-muted) 62%) 100% 0/250% 100% no-repeat;-webkit-background-clip:text;background-clip:text;color:transparent;animation:kts-shine 2.6s linear infinite}
+.kts-comet{position:absolute;left:0;right:0;bottom:0;height:1px;overflow:hidden;pointer-events:none}
+.kts-comet::after{content:"";position:absolute;top:0;bottom:0;left:0;width:34%;background:linear-gradient(90deg,transparent,var(--kael-accent),transparent);animation:kts-comet 2s cubic-bezier(.45,0,.25,1) infinite}
+.kts-ping{position:relative}
+.kts-ping::after{content:"";position:absolute;inset:-3px;border-radius:9999px;border:1px solid var(--kael-accent);animation:kts-ping 1.4s ease-out infinite}
+@keyframes kts-wave{0%,60%,100%{background:var(--kael-border);transform:scale(.7);box-shadow:none}30%{background:var(--kael-accent);transform:scale(1.15);box-shadow:0 0 9px rgb(var(--kael-accent-rgb) / .45)}}
+@keyframes kts-breathe{0%,100%{opacity:.35;transform:scale(.85)}50%{opacity:1;transform:scale(1.1)}}
+@keyframes kts-draw{to{stroke-dashoffset:0}}
+@keyframes kts-in{from{opacity:0;transform:translateY(7px);filter:blur(3px)}to{opacity:1;transform:none;filter:none}}
+@keyframes kts-out{from{opacity:1;transform:none;filter:none}to{opacity:0;transform:translateY(-7px);filter:blur(3px)}}
+@keyframes kts-shine{from{background-position:100% 0}to{background-position:0 0}}
+@keyframes kts-comet{from{transform:translateX(-100%)}to{transform:translateX(295%)}}
+@keyframes kts-ping{from{transform:scale(.6);opacity:.8}to{transform:scale(1.6);opacity:0}}
+@media (prefers-reduced-motion:reduce){
+.kts-lattice i,.kts-orb,.kts-shimmer,.kts-comet::after,.kts-ping::after{animation:none!important}
+.kts-lattice i:nth-child(5){background:var(--kael-accent)}
+.kts-shimmer{color:var(--kael-muted);background:none}
+.kts-in,.kts-out,.kts-check circle,.kts-check path{animation-duration:.01s!important}
+}
+`;
+
+function formatClock(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+/** 3x3 lattice: an emerald wave sweeps diagonally across a rotated grid. */
+function Lattice() {
+  return (
+    <span
+      aria-hidden="true"
+      className="relative flex h-8 w-8 items-center justify-center"
+    >
+      <span className="kts-orb" />
+      <span className="kts-lattice relative">
+        {Array.from({ length: 9 }, (_, index) => {
+          const row = Math.floor(index / 3);
+          const column = index % 3;
+          return (
+            <i
+              key={index}
+              style={{ animationDelay: `${(row + column) * 0.16}s` }}
+            />
+          );
+        })}
+      </span>
+    </span>
+  );
+}
+
+/** Ring and check mark that draw themselves once the answer is ready. */
+function DoneMark() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 32 32"
+      className="kts-check h-8 w-8"
+      fill="none"
+      stroke="#10B981"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle
+        cx="16"
+        cy="16"
+        r="10.5"
+        pathLength={1}
+        strokeOpacity=".4"
+        strokeWidth="1.5"
+      />
+      <path d="M11.5 16.5l3 3 6-6.5" pathLength={1} strokeWidth="1.75" />
+    </svg>
+  );
+}
+
+/** Cross-fades between status texts: the old one slides up, the new one rises in. */
+function StatusText({ text, shimmer }: { text: string; shimmer: boolean }) {
+  const [shown, setShown] = useState(text);
+  const [leaving, setLeaving] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (text === shown) {
+      return undefined;
+    }
+    setLeaving(shown);
+    setShown(text);
+    const timer = window.setTimeout(() => setLeaving(null), 320);
+    return () => window.clearTimeout(timer);
+    // `shown` is intentionally read from the render that saw the new `text`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+
+  return (
+    <span className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)] text-sm leading-5">
+      {leaving !== null && (
+        <span
+          key={`out-${leaving}`}
+          aria-hidden="true"
+          className="kts-out col-start-1 row-start-1 min-w-0"
+        >
+          <span className="block truncate">{leaving}</span>
+        </span>
+      )}
+      <span key={shown} className="kts-in col-start-1 row-start-1 min-w-0">
+        <span className={`block truncate ${shimmer ? "kts-shimmer" : ""}`}>
+          {shown}
+        </span>
+      </span>
+    </span>
+  );
+}
+
 export default function ThinkingStatus({
   isThinking,
   userMessage = "",
   durationMs,
   mode = "balanced",
+  statuses,
+  status,
+  intervalMs,
+  loop = false,
+  defaultExpanded = false,
+  hideSteps = false,
+  showTimer = true,
+  onStepChange,
+  className = "",
 }: ThinkingStatusProps) {
   const { t } = useI18n();
-  const [activeStep, setActiveStep] = useState(0);
-  const [expanded, setExpanded] = useState(isThinking);
-  const displaySteps = useMemo(
-    () => buildThinkingSteps(userMessage, mode, t),
+  const [active, setActive] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const onStepChangeRef = useRef(onStepChange);
+  onStepChangeRef.current = onStepChange;
+
+  const generated = useMemo(
+    () => buildThinkingSteps(userMessage, mode, t).map((step) => step.label),
     [mode, t, userMessage],
   );
+  const labels = useMemo(() => {
+    const custom = statuses?.filter((label) => label.trim().length > 0);
+    return custom && custom.length > 0 ? custom : generated;
+  }, [statuses, generated]);
+
+  const count = labels.length;
+  const controlled = status !== undefined;
+  const delay = intervalMs ?? (mode === "fast" ? 900 : mode === "deep" ? 1500 : 1200);
 
   useEffect(() => {
     if (!isThinking) {
-      setExpanded(false);
       return undefined;
     }
 
-    setExpanded(true);
-    setActiveStep(0);
-    const stepDuration = mode === "fast" ? 700 : mode === "deep" ? 1200 : 1050;
-    const interval = window.setInterval(() => {
-      setActiveStep((current) =>
-        Math.min(current + 1, Math.max(displaySteps.length - 1, 0)),
-      );
-    }, stepDuration);
+    setActive(0);
+    setElapsed(0);
+    const startedAt = performance.now();
+    const clock = window.setInterval(
+      () => setElapsed(Math.floor((performance.now() - startedAt) / 1000)),
+      500,
+    );
+    const rotation =
+      !controlled && count > 1
+        ? window.setInterval(
+            () =>
+              setActive((current) =>
+                loop ? (current + 1) % count : Math.min(current + 1, count - 1),
+              ),
+            delay,
+          )
+        : undefined;
 
-    return () => window.clearInterval(interval);
-  }, [displaySteps.length, isThinking, mode]);
+    return () => {
+      window.clearInterval(clock);
+      if (rotation !== undefined) {
+        window.clearInterval(rotation);
+      }
+    };
+  }, [isThinking, controlled, count, delay, loop]);
 
-  if (!isThinking && !userMessage) {
+  const currentIndex = Math.min(active, Math.max(count - 1, 0));
+  const activeLabel =
+    status ?? labels[currentIndex] ?? t("thinking.processing");
+
+  useEffect(() => {
+    if (isThinking) {
+      onStepChangeRef.current?.(currentIndex, activeLabel);
+    }
+  }, [isThinking, currentIndex, activeLabel]);
+
+  if (!isThinking && !userMessage && !statuses && status === undefined) {
     return null;
   }
 
@@ -308,92 +493,82 @@ export default function ThinkingStatus({
     typeof durationMs === "number" && durationMs > 0
       ? t("thinking.doneIn", { seconds: (durationMs / 1000).toFixed(1) })
       : t("thinking.done");
-  const activeLabel =
-    displaySteps[activeStep % displaySteps.length]?.label ??
-    t("thinking.processing");
   const summary = isThinking ? activeLabel : finishedLabel;
 
   return (
     <div
       role="status"
       aria-live="polite"
-      className={`kael-topline w-full overflow-hidden rounded-2xl border bg-[#07070a]/80 shadow-[0_24px_70px_-34px_rgba(0,0,0,0.95)] backdrop-blur-2xl transition-colors duration-200 ${
-        isThinking
-          ? "border-[#f093fb]/30 shadow-[0_24px_70px_-34px_rgba(0,0,0,0.95),0_0_50px_-20px_rgba(245,87,108,0.4)]"
-          : "border-white/[0.08] hover:border-white/[0.14]"
-      }`}
+      aria-busy={isThinking}
+      className={`relative w-full overflow-hidden rounded-xl border border-[#262626] bg-[#161616] text-[#8E8E8A] transition-colors duration-300 hover:border-[#333] ${className}`}
     >
+      <style href="kael-thinking-status" precedence="default">
+        {STYLES}
+      </style>
+
       <button
         type="button"
+        disabled={hideSteps}
         onClick={() => setExpanded((current) => !current)}
-        aria-expanded={expanded}
-        className="flex w-full items-center gap-3 px-5 py-3.5 text-left"
+        aria-expanded={hideSteps ? undefined : expanded}
+        className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#10B981]/50 disabled:cursor-default"
       >
-        <span className="relative flex h-3 w-3 shrink-0 items-center justify-center">
-          <span
-            className={`absolute h-3 w-3 rounded-full bg-kael-gradient ${
-              isThinking ? "kael-pulse opacity-40" : "opacity-25"
-            }`}
-          />
-          <span className="h-1.5 w-1.5 rounded-full bg-kael-gradient" />
-        </span>
-        <span
-          className={`min-w-0 flex-1 truncate text-sm font-medium ${
-            isThinking ? "text-zinc-200" : "text-zinc-400"
-          }`}
-        >
-          {summary}
-        </span>
-        {expanded ? (
+        {isThinking ? <Lattice key="busy" /> : <DoneMark key="done" />}
+        <StatusText text={summary} shimmer={isThinking} />
+        {isThinking && showTimer && (
+          <span className="shrink-0 font-mono text-[11px] tabular-nums text-[#8E8E8A]/60">
+            {formatClock(elapsed)}
+          </span>
+        )}
+        {!hideSteps && (
           <ChevronDown
-            size={16}
+            size={15}
             strokeWidth={1.5}
-            className="shrink-0 text-zinc-600"
-          />
-        ) : (
-          <ChevronRight
-            size={16}
-            strokeWidth={1.5}
-            className="shrink-0 text-zinc-600"
+            aria-hidden="true"
+            className={`shrink-0 text-[#8E8E8A]/70 transition-transform duration-300 ${
+              expanded ? "rotate-180" : ""
+            }`}
           />
         )}
       </button>
 
-      {expanded && (
-        <div className="border-t border-white/[0.06] px-5 py-4">
-          <ol className="space-y-3">
-            {displaySteps.map((step, index) => {
-              const done = !isThinking || index < activeStep;
-              const current = isThinking && index === activeStep;
+      {!hideSteps && (
+        <div
+          aria-hidden={!expanded}
+          className={`grid transition-[grid-template-rows] duration-300 ease-out ${
+            expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+          }`}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <ol className="space-y-0.5 border-t border-[#262626] px-3.5 py-3">
+              {labels.map((label, index) => {
+                const done = !isThinking || index < currentIndex;
+                const current = isThinking && index === currentIndex;
 
-              return (
-                <li key={`${step.label}-${index}`} className="flex items-start gap-3">
-                  <span
-                    className={`mt-2 h-1.5 w-1.5 shrink-0 rounded-full transition-colors duration-200 ${
-                      done
-                        ? "bg-kael-gradient"
-                        : current
-                          ? "bg-white"
-                          : "bg-zinc-700"
-                    }`}
-                  />
-                  <span
-                    className={`text-sm leading-6 transition-colors duration-200 ${
-                      current
-                        ? "text-zinc-100"
-                        : done
-                          ? "text-zinc-400"
-                          : "text-zinc-600"
+                return (
+                  <li
+                    key={`${label}-${index}`}
+                    className={`flex items-center gap-3 py-1 text-[13px] leading-5 transition-opacity duration-300 ${
+                      current ? "opacity-100" : done ? "opacity-60" : "opacity-35"
                     }`}
                   >
-                    {step.label}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
+                    <span className="flex h-2 w-8 shrink-0 items-center justify-center">
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full transition-colors duration-300 ${
+                          done || current ? "bg-[#10B981]" : "bg-[#262626]"
+                        } ${current ? "kts-ping" : ""}`}
+                      />
+                    </span>
+                    <span className="min-w-0">{label}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
         </div>
       )}
+
+      {isThinking && <span aria-hidden="true" className="kts-comet" />}
     </div>
   );
 }

@@ -1,43 +1,150 @@
 # KAEL — деплой без Vercel
 
-Схема:
+Архитектура:
 
 ```
-Пользователь
-   │
-   ├── https://YOUR-SITE.infinityfreeapp.com   (статика Next.js из out/)
-   │        ├── POST /auth/telegram-webapp      (initData из Telegram)
-   │        └── POST /api/chat                  (Authorization: Bearer ...)
-   │
-   └── https://YOUR-SERVICE.onrender.com       (FastAPI + uvicorn)
-            ├── GET  /health                   (публичный)
-            ├── POST /auth/telegram-webapp     (проверка initData)
-            └── POST /api/chat                 (только с токеном)
+Браузер
+  ├─ статический Next.js (InfinityFree)
+  │    https://kael-ai.ct.ws
+  │    ├─ Clerk JS (CDN)              вход, сессия, JWT-шаблон `kael`
+  │    ├─ GET  /api/me                Authorization: Bearer <Clerk JWT>
+  │    └─ POST /api/chat              Authorization: Bearer <Clerk JWT>
+  │
+  └─ FastAPI (Render)
+       https://kael-api.onrender.com
+       ├─ GET  /health                публичная проверка
+       ├─ GET  /api/me                проверка подписи по JWKS
+       └─ POST /api/chat              проверка подписи по JWKS
 ```
 
-Фронтенд полностью статический: Next.js собирает HTML/CSS/JS в `frontend/out/`.
-Бэкенд — обычный Python-процесс `uvicorn main:app`, которому нужен хостинг с Python.
+Frontend — полностью статический экспорт (`next build` → `frontend/out/`).
+Backend — Python/FastAPI под `uvicorn`. Clerk работает только в браузере:
+статический экспорт не поддерживает middleware и серверный `auth()`, поэтому
+FastAPI сам проверяет RS256-подпись сессионного токена через JWKS и извлекает
+роль.
+
+> Не запускайте `clerk init` и не добавляйте `middleware.ts` или `app/api/*`:
+> они несовместимы с `output: "export"`. Вся настройка Clerk выполняется вручную
+> в Dashboard.
 
 ---
 
-## 1. Бэкенд на Render (рекомендуемый вариант)
+## 1. Clerk: настройка приложения
 
-### 1.1. Подготовьте репозиторий
+### 1.1. Создайте приложение
 
-Загрузите проект в GitHub. В корне репозитория уже лежит `render.yaml`, а в
-`backend/` — `Procfile`, `Dockerfile` и `.python-version`.
+1. Откройте [dashboard.clerk.com](https://dashboard.clerk.com) → **Create application**.
+2. Включите **Email + password**. OAuth-провайдеры можно добавить позже.
+3. Скопируйте **Publishable key** (`pk_test_…` или `pk_live_…`).
+4. Скопируйте **Frontend API URL** — он же `CLERK_ISSUER`, например
+   `https://your-instance.clerk.accounts.dev`.
 
-Render Blueprint сам найдёт `render.yaml` в корне.
+Publishable key публичный и попадает в JS-бандл. Secret key фронтенду и
+бэкенду не нужен: подпись токена проверяется через публичный JWKS.
 
-### 1.2. Создайте сервис
+### 1.2. JWT-шаблон `kael`
+
+Backend запрашивает токен строго с шаблоном `kael`:
+
+```ts
+getToken({ template: "kael" })
+```
+
+Создайте шаблон в **Sessions → JWT templates → New template → Blank**:
+
+- **Name:** `kael` (обязательно точно такое имя);
+- **Claims:**
+
+```json
+{
+  "role": "{{user.public_metadata.role}}"
+}
+```
+
+Стандартные claims (`sub`, `exp`, `iat`, `azp`) Clerk добавляет сам. Backend
+требует их наличия, поэтому не удаляйте их и не заменяйте шаблон целиком на
+собственный JSON без этих полей.
+
+Если шаблон не создан, `getToken({ template: "kael" })` вернёт ошибку, а
+`/api/me` и `/api/chat` ответят `401`.
+
+### 1.3. Роли пользователей
+
+Роль хранится в **public metadata** пользователя:
+
+```json
+{ "role": "admin" }
+```
+
+Допустимые значения:
+
+| `public_metadata.role` | Доступ |
+| --- | --- |
+| `admin` | dev-режим, повышенные лимиты, остальные возможности администратора |
+| `tester` | тариф Elite, бесплатный доступ |
+| `user` или поле отсутствует | обычный бесплатный тариф |
+
+Backend читает сначала claim `role`, затем `metadata.role` и
+`public_metadata.role`. Неизвестное значение трактуется как `user`.
+
+После изменения роли пользователь должен выйти и войти снова (или дождаться
+обновления сессии), потому что старый токен ещё содержит прежние claims.
+
+### 1.4. Разрешённые origin
+
+В Clerk Dashboard добавьте адреса, с которых открывается приложение:
+
+- `http://localhost:3000`
+- `http://127.0.0.1:3000`
+- `https://kael-ai.ct.ws`
+
+Точное расположение раздела зависит от версии Dashboard: **Domains →
+Allowed origins** либо **Settings → Restrictions**. Без этого Clerk может
+отклонить запросы с продакшен-домена.
+
+### 1.5. Production instance и DNS
+
+Для beta можно остаться на development instance (`*.clerk.accounts.dev`).
+Для production instance Clerk попросит привязать домен `kael-ai.ct.ws` и
+добавит CNAME-записи (обычно `clerk`, `accounts`, `clkmail`) в DNS.
+
+1. Откройте **Domains → Add domain**.
+2. Скопируйте CNAME-записи, которые покажет Clerk.
+3. Добавьте их у DNS-провайдера домена (панель InfinityFree или ваш регистратор).
+4. Дождитесь статуса **Verified** и выпуска сертификата.
+
+После переключения на production instance:
+
+- publishable key станет `pk_live_…`;
+- `CLERK_ISSUER` станет `https://clerk.kael-ai.ct.ws` (точное значение берите
+  из Dashboard, раздел **API keys → Frontend API URL**);
+- фронтенд нужно пересобрать, потому что publishable key встраивается на этапе
+  сборки.
+
+---
+
+## 2. Backend на Render
+
+### 2.1. Подготовка репозитория
+
+Код backend лежит в `backend/`. В корне есть `render.yaml`, поэтому Render
+может создать сервис через Blueprint.
+
+### 2.2. Создание сервиса
 
 Вариант A — Blueprint:
 
 1. Render Dashboard → **New +** → **Blueprint**.
-2. Подключите GitHub-репозиторий KAEL.
+2. Выберите GitHub-репозиторий KAEL.
 3. Render прочитает `render.yaml` и создаст web service `kael-api`.
-4. Заполните секреты, которые помечены `sync: false` (см. таблицу ниже).
+4. Заполните обязательные переменные, помеченные `sync: false`: `CLERK_ISSUER`
+   и ключи провайдеров, которые будете использовать.
 5. Нажмите **Apply**.
+
+Origin'ы, `KAEL_ENV`, `KAEL_SECRET_KEY`, `KAEL_PUBLIC_FRONTEND_URL` и
+`KAEL_TRUST_PROXY_HEADERS` уже заданы в `render.yaml`. Если домен изменится,
+обновите `KAEL_ALLOWED_ORIGINS`, `CLERK_AUTHORIZED_PARTIES` и
+`KAEL_PUBLIC_FRONTEND_URL` в Dashboard.
 
 Вариант B — вручную:
 
@@ -50,445 +157,335 @@ Render Blueprint сам найдёт `render.yaml` в корне.
    - **Start Command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`
    - **Health Check Path:** `/health`
    - **Plan:** Free
-4. Добавьте переменные окружения из таблицы.
+4. Добавьте переменные окружения из таблицы ниже.
 
-### 1.3. Переменные окружения Render
+### 2.3. Переменные окружения Render
 
 | Переменная | Обязательна | Значение |
 | --- | --- | --- |
 | `PYTHON_VERSION` | да | `3.11.9` |
-| `OPENROUTER_API_KEY` | да, если используете OpenRouter | ключ с openrouter.ai |
-| `GROQ_API_KEY` | нет | ключ Groq, если нужен провайдер Groq |
-| `TELEGRAM_BOT_TOKEN` | да | токен бота из @BotFather, только на бэкенде |
-| `KAEL_JWT_SECRET` | да | длинный случайный секрет для сессионных токенов |
-| `KAEL_ALLOWED_TG_IDS` | нет | ID пользователей через запятую для закрытой беты; пусто = все |
-| `KAEL_DEV_SECRET` | да | длинный случайный секрет, не `kael-dev-2026` |
-| `KAEL_ALLOWED_ORIGINS` | да | `https://YOUR-SITE.infinityfreeapp.com` |
-| `OPENROUTER_HTTP_REFERER` | желательно | `https://YOUR-SITE.infinityfreeapp.com` |
+| `KAEL_ENV` | да | `production` |
+| `KAEL_SECRET_KEY` | да | случайная строка ≥32 символов; шифрует MCP-токены. На Render можно включить **Generate** |
+| `KAEL_DATA_DIR` | нет | каталог SQLite и ключа; по умолчанию `backend/data` |
+| `KAEL_TRUST_PROXY_HEADERS` | да | `1` — брать реальный IP из `X-Forwarded-For` и `CF-Connecting-IP` для rate limit |
+| `KAEL_XFF_TRUSTED_ENTRIES` | нет | `1` — сколько правых записей `X-Forwarded-For` добавлено прокси; клиентский IP берётся левее |
+| `KAEL_PUBLIC_API_URL` | рекомендуется | публичный HTTPS-URL backend без `/`; если пусто, используется `RENDER_EXTERNAL_URL` |
+| `KAEL_PUBLIC_FRONTEND_URL` | да | `https://kael-ai.ct.ws` |
+| `KAEL_MCP_REDIRECT_URI` | нет | переопределение OAuth redirect URI; обычно пусто |
+| `KAEL_MCP_ALLOW_LOCAL` | нет | `0`; `KAEL_ENV=production` принудительно выключает localhost |
+| `OPENROUTER_API_KEY` | да, если нужен OpenRouter | ключ с openrouter.ai |
+| `GROQ_API_KEY` | нет | ключ Groq, если нужна модель по умолчанию на Groq |
+| `ZEROCAT_API_KEY` | нет | ключ ZeroCat (`https://api.zero.cat/v1`) |
+| `GEMINI_API_KEY` | нет | ключ Google Gemini (OpenAI-compatible endpoint) |
+| `ZEROCAT_MODEL` | нет | модель ZeroCat по умолчанию; обычно `gpt-5.6-sol` |
+| `GEMINI_MODEL` | нет | модель Gemini по умолчанию; обычно `gemini-3.6-flash` |
+| `CLERK_ISSUER` | да | Frontend API URL из Clerk, без завершающего `/` |
+| `CLERK_JWKS_URL` | нет | переопределение JWKS для прокси; обычно пусто |
+| `CLERK_AUTHORIZED_PARTIES` | да | `https://kael-ai.ct.ws` |
+| `KAEL_ALLOWED_ORIGINS` | да | `https://kael-ai.ct.ws` |
+| `OPENROUTER_HTTP_REFERER` | рекомендуется | `https://kael-ai.ct.ws` |
 | `OPENROUTER_APP_NAME` | нет | `KAEL` |
-| `KAEL_ALLOWED_ORIGIN_REGEX` | нет | оставьте пустым, если хватает точного origin |
+| `KAEL_ALLOWED_ORIGIN_REGEX` | нет | regex для дополнительных origin; обычно пусто |
 
-Важно:
+Пояснения:
 
-- `KAEL_ALLOWED_ORIGINS` — это **точный origin**: схема + домен, без пути и без
-  завершающего `/`. Несколько адресов разделяются запятой:
-  `https://kael.infinityfreeapp.com,https://www.kael.infinityfreeapp.com`.
-- Локальные `http://localhost:3000` и `http://127.0.0.1:3000` (а также порт
-  3001) разрешены всегда, поэтому с тем же бэкендом можно тестировать локально.
-- После изменения переменных Render перезапускает сервис автоматически. Если
-  нет — **Manual Deploy → Restart service**.
-- `TELEGRAM_BOT_TOKEN` и `KAEL_JWT_SECRET` — секреты. Не попадают в статический
-  фронтенд и не коммитятся в репозиторий.
-- `KAEL_JWT_SECRET` можно сгенерировать так:
-  `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
-- `OLLAMA_BASE_URL` на облаке не заработает: Ollama должна быть запущена рядом с
-  бэкендом. На бесплатном хостинге используйте OpenRouter или Groq.
+- `KAEL_ENV=production` убирает локальные origin'ы из CORS, включает HSTS и
+  принудительно выключает `KAEL_MCP_ALLOW_LOCAL`. Без явного
+  `KAEL_ALLOWED_ORIGINS` фронтенд получит CORS-ошибку.
+- `KAEL_ALLOWED_ORIGINS` — точные origin'ы для CORS, со схемой и доменом, без
+  завершающего `/`. Несколько значений — через запятую. Локальные
+  `http://localhost:3000` и `http://127.0.0.1:3000` разрешены только вне
+  production.
+- `CLERK_AUTHORIZED_PARTIES` — значения claim `azp`, которые принимает backend.
+  Если переменная пуста, используется `KAEL_ALLOWED_ORIGINS`. В production
+  localhost-origin'ы не принимаются: без явного продакшен-домена все запросы
+  получат `403 "Источник сессии не разрешён."`.
+- `CLERK_JWKS_URL` нужен только при проксировании Clerk. В обычной схеме
+  оставьте пустым: backend возьмёт `CLERK_ISSUER/.well-known/jwks.json`.
+- `CLERK_SECRET_KEY` backend не использует. Не добавляйте его ни на фронтенд,
+  ни в статический бандл.
+- `KAEL_SECRET_KEY` шифрует bearer- и OAuth-токены MCP в SQLite. Если ключ
+  изменится, старые токены перестанут расшифровываться и серверы придётся
+  авторизовать заново. Задайте его до первого подключения MCP-сервера.
+- OAuth callback MCP по умолчанию — `KAEL_PUBLIC_API_URL/api/mcp/oauth/callback`.
+  Если `KAEL_PUBLIC_API_URL` не задан, используется `RENDER_EXTERNAL_URL`.
+  Этот адрес должен быть доступен из браузера; при необходимости задайте
+  `KAEL_MCP_REDIRECT_URI` и добавьте его в настройки OAuth-провайдера.
+- `KAEL_PUBLIC_FRONTEND_URL` используется страницей успешного OAuth-callback
+  для кнопки возврата в KAEL. Домен должен совпадать с фронтендом.
+- SQLite MCP лежит на диске Render. На free-плане диск эфемерный: после
+  redeploy подключения и токены пропадут. Для постоянного хранения нужен
+  платный persistent disk и `KAEL_DATA_DIR` на нём.
 
-### 1.4. Получите публичный URL
+Дополнительно можно настроить:
 
-После деплоя Render покажет адрес вида:
-
+```env
+OPENROUTER_MODEL=openai/gpt-4o-mini
+GROQ_MODEL=openai/gpt-oss-120b
+OLLAMA_MODEL=llama3
+OLLAMA_BASE_URL=http://localhost:11434
+GROQ_TIMEOUT_SECONDS=60
+OPENROUTER_TIMEOUT_SECONDS=60
+OLLAMA_TIMEOUT_SECONDS=120
+KAEL_FAST_MAX_TOKENS=512
+KAEL_BALANCED_MAX_TOKENS=1024
+KAEL_DEEP_MAX_TOKENS=2048
+KAEL_DEV_MAX_TOKENS=8192
+KAEL_MAX_ATTACHMENTS=6
+KAEL_MAX_ATTACHMENT_BASE64_CHARS=14000000
+KAEL_MAX_PDF_CHARS=30000
+KAEL_MAX_TEXT_ATTACHMENT_CHARS=60000
 ```
-https://kael-api-xxxx.onrender.com
-```
 
-Проверьте:
+Ollama на бесплатном Render недоступна: локальный сервер не виден из облака.
+В продакшене используйте OpenRouter или Groq.
+
+### 2.4. Проверка backend
+
+После деплоя:
 
 ```powershell
 curl.exe https://kael-api-xxxx.onrender.com/health
 # {"status":"ok"}
 ```
 
-Этот URL понадобится для `NEXT_PUBLIC_KAEL_API_URL`.
+Запрос без токена должен вернуть `401`:
 
-### 1.5. Особенности бесплатного Render
+```powershell
+curl.exe -i https://kael-api-xxxx.onrender.com/api/me
+```
 
-- Сервис засыпает после ~15 минут без запросов. Первый запрос после сна может
-  занимать 30–60 секунд.
-- Диск эфемерный: не храните на нём базу данных и загруженные файлы.
-- Если нужен «прогрев», можно периодически дергать `/health` через UptimeRobot
-  или cron-job.org. Не делайте интервал слишком частым.
+Полный адрес сохраните — он понадобится как `NEXT_PUBLIC_KAEL_API_URL`.
 
----
+### 2.5. Особенности бесплатного Render
 
-## 2. Альтернатива: Koyeb
-
-1. Создайте **App** → **GitHub** → выберите репозиторий.
-2. **Work directory:** `backend`.
-3. **Build command:** `pip install -r requirements.txt`.
-4. **Run command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`.
-5. **Port:** `8000`, protocol HTTP.
-6. Добавьте те же переменные окружения, что и для Render.
-7. Deploy.
-
-Koyeb также умеет собирать `backend/Dockerfile`:
-
-- **Builder:** Dockerfile
-- **Dockerfile path:** `backend/Dockerfile`
-- **Port:** `8000`
-
-`Dockerfile` слушает `${PORT:-7860}`, поэтому подходит и для Hugging Face Spaces.
-
-### Hugging Face Spaces (опционально)
-
-1. Создайте Space с SDK **Docker**.
-2. Загрузите содержимое `backend/` (или подключите репозиторий).
-3. В `README.md` Space укажите `app_port: 7860` (если используете стандартный
-   порт HF) либо задайте переменную `PORT`.
-4. Секреты (`OPENROUTER_API_KEY`, `KAEL_ALLOWED_ORIGINS` и т.д.) добавьте в
-   **Settings → Variables and secrets**.
-5. Откройте публичный URL Space и проверьте `/health`.
+- Сервис засыпает после ~15 минут без запросов. Первый запрос после сна
+  занимает 30–60 секунд.
+- Диск непостоянный: SQLite MCP, OAuth-токены и `secret.key` теряются при
+  redeploy. `KAEL_SECRET_KEY` вынесите в env (Blueprint делает это через
+  `generateValue: true`); для сохранения самих подключений нужен платный
+  persistent disk и `KAEL_DATA_DIR` на нём.
+- Для прогрева можно пинговать `/health` через UptimeRobot или cron-job.org.
+- После изменения переменных нужен **Manual Deploy → Restart service**:
+  Render не перезапускает процесс автоматически.
 
 ---
 
 ## 3. Сборка статического фронтенда
 
-### 3.1. Установите зависимости
-
-Нужен Node.js 20+.
+### 3.1. Зависимости
 
 ```powershell
 cd frontend
 npm ci
 ```
 
-### 3.2. Пропишите URL бэкенда
+### 3.2. Переменные production-сборки
 
-Скопируйте пример:
+Создайте `frontend/.env.production`:
 
-```powershell
-Copy-Item .env.production.example .env.production
-```
-
-Откройте `frontend/.env.production` и замените значение:
-
-```dotenv
+```env
 NEXT_PUBLIC_KAEL_API_URL=https://kael-api-xxxx.onrender.com
-NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=your_bot_username
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxxxxxxxxx
 ```
-
-`NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` — публичное имя бота без `@`. Оно нужно для
-кнопки «Открыть в Telegram» на экране блокировки. Это не секрет.
 
 Правила:
 
-- Только публичный **HTTPS**-URL бэкенда.
-- Без завершающего `/`.
-- Не `localhost` и не LAN-адрес: значение вшивается в JS на этапе сборки.
-- После изменения URL нужно пересобрать статику.
+- Оба значения встраиваются в бандл на этапе сборки. После изменения нужен
+  повторный `npm run build`.
+- `NEXT_PUBLIC_KAEL_API_URL` — HTTPS-адрес backend без завершающего `/`.
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — publishable key, не secret key.
+- `.env.local` имеет приоритет над `.env.production`. Если он существует,
+  удалите или переименуйте его перед production-сборкой.
+- `.env.development.local` действует только в `next dev`; на production-сборку
+  он не влияет.
 
-> Важно: в Next.js `.env.local` имеет приоритет выше `.env.production`.
-> В проекте локальный адрес вынесен в `frontend/.env.development.local` — этот
-> файл загружается только командой `next dev` и не влияет на production-сборку.
->
-> Если вы сами создали `frontend/.env.local` с локальным URL, удалите его или
-> переименуйте на время сборки:
->
-> ```powershell
-> Rename-Item .env.local .env.local.dev
-> ```
->
-> После сборки можно вернуть:
->
-> ```powershell
-> Rename-Item .env.local.dev .env.local
-> ```
->
-> Альтернатива — передать переменную прямо в процессе сборки, она имеет
-> наивысший приоритет:
->
-> ```powershell
-> $env:NEXT_PUBLIC_KAEL_API_URL="https://kael-api-xxxx.onrender.com"
-> npm run build
-> ```
+Если ключ Clerk пуст, сборка не падает, но приложение показывает экран
+настройки вместо формы входа. Prebuild-скрипт выводит предупреждение.
 
-### 3.3. Соберите `out/`
+### 3.3. Сборка
 
 ```powershell
+npm run theme:light
+npm run typecheck
 npm run build
 ```
 
-Перед сборкой автоматически запускается `scripts/check-production-env.mjs`.
-Он откажется собирать статику, если:
+`theme:light` пересобирает `app/theme-light.css` по фактически используемым
+классам. Запускайте его после добавления или изменения UI, иначе светлая тема
+потеряет часть стилей.
 
-- URL пустой;
-- URL ведёт на `localhost`, `127.0.0.1` или LAN-адрес (`192.168.*`, `10.*`,
-  `172.16–31.*`);
-- URL не использует HTTPS;
-- остался placeholder вроде `YOUR-BACKEND`;
-- в URL есть путь, query или hash.
-
-Это защищает от случайной публикации сборки, которая ходит на локальный
-бэкенд. Для локального предпросмотра статики можно явно разрешить локальный
-URL:
-
-```powershell
-$env:KAEL_ALLOW_LOCAL_BUILD="1"
-npm run build
-```
-
-Для production этот флаг использовать не нужно.
-
-В `next.config.mjs` уже включены:
-
-```js
-output: "export",
-trailingSlash: true,
-images: { unoptimized: true },
-```
-
-Поэтому после сборки появится папка `frontend/out/`:
+Результат — каталог `frontend/out/`:
 
 ```
 out/
-├── .htaccess
-├── 404.html
-├── 404/
-├── _next/
-├── icon.svg
-├── index.html
-└── index.txt
+  index.html
+  404.html
+  privacy/index.html
+  terms/index.html
+  security/index.html
+  _next/static/...
+  mascot/slime.js
+  mascot/slime.css
+  icon.svg
+  .htaccess
 ```
 
-`out/.htaccess` создаётся из `frontend/public/.htaccess` автоматически.
+`npm run build` использует `output: "export"` и `trailingSlash: true`, поэтому
+каждая страница — каталог с `index.html`. `.htaccess` копируется из `public/`
+автоматически.
 
-### 3.4. Проверьте сборку
-
-```powershell
-Test-Path out\index.html          # True
-Test-Path out\.htaccess           # True
-Select-String -Path out\_next\static\chunks\app\*.js -Pattern "onrender.com"
-```
-
-В выводе должен быть ваш бэкенд-URL. Если видите `localhost` или `192.168.*`,
-значит `.env.local` (или `.env.production.local`) перекрыл production-переменную —
-пересоберите.
-
-Локальный предпросмотр статики:
+### 3.4. Локальная проверка
 
 ```powershell
 npm run preview
 # http://localhost:3000
 ```
 
-`npm run preview` использует `npx serve out`. Это только локальная проверка;
-на InfinityFree Node.js не нужен.
+Проверьте:
+
+1. Экран входа Clerk открывается.
+2. Регистрация и вход по email/password работают.
+3. После входа загружается чат, в шапке видна роль.
+4. Сообщение отправляется, ответ приходит, маскот реагирует.
+5. `GET /api/me` возвращает ожидаемую роль.
+6. Выход возвращает на экран входа.
+7. `/privacy/`, `/terms/`, `/security/` открываются без сессии и
+   переключают RU/UK/EN.
+8. В настройках → MCP-серверы добавленный сервер проходит `initialize`,
+   показывает инструменты, а изменяющий вызов требует подтверждения в чате.
 
 ---
 
 ## 4. Загрузка на InfinityFree
 
-### 4.1. Подготовьте сайт
+### 4.1. Подготовка сайта
 
-1. Зарегистрируйтесь на infinityfree.com.
-2. Создайте аккаунт и добавьте домен/поддомен.
-3. Дождитесь активации (обычно несколько минут).
-4. Запомните адрес вида `https://YOUR-SITE.infinityfreeapp.com` — он должен
-   совпадать с `KAEL_ALLOWED_ORIGINS` на бэкенде.
+1. В панели InfinityFree откройте **Online File Manager** для `kael-ai.ct.ws`.
+2. Перейдите в корень сайта (`htdocs`).
+3. Удалите старые файлы предыдущей сборки, чтобы не остались устаревшие
+   хэшированные чанки.
 
-### 4.2. Загрузите файлы
+### 4.2. Загрузка
 
-Через **Online File Manager**:
+Загрузите **содержимое** `frontend/out/`, а не саму папку `out`:
 
-1. Control Panel → **Online File Manager**.
-2. Откройте `htdocs`.
-3. Удалите стандартные `index2.html` / `default.php`, если они есть.
-4. Загрузите **содержимое** папки `out/` в `htdocs`, а не саму папку `out`.
-   В `htdocs` должны оказаться `index.html`, `_next/`, `404.html`, `icon.svg`,
-   `index.txt` и `.htaccess`.
-
-Через FTP (надёжнее для скрытых файлов):
-
-1. Control Panel → **FTP Accounts** → скопируйте host, username, password.
-2. Подключитесь FileZilla к `ftp.infinityfree.com` (или host из панели).
-3. Включите показ скрытых файлов: **Server → Force showing hidden files**.
-4. Загрузите содержимое `out/` в `htdocs`.
-5. Убедитесь, что `.htaccess` лежит именно в `htdocs/.htaccess`.
-
-Если File Manager не показывает `.htaccess`, загрузите его через FTP или
-создайте файл вручную и вставьте содержимое `frontend/public/.htaccess`.
-
-### 4.3. Включите HTTPS
-
-1. Control Panel → **SSL Certificates** → выпустите бесплатный сертификат для
-   вашего домена.
-2. Дождитесь статуса Active.
-3. Включите **Force HTTPS** в панели InfinityFree либо раскомментируйте блок
-   HTTPS-редиректа в `htdocs/.htaccess`:
-
-```apache
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteCond %{HTTPS} !=on
-  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-</IfModule>
+```
+htdocs/
+  index.html
+  _next/
+  mascot/
+  icon.svg
 ```
 
-### 4.4. Проверьте сайт
+Проще всего загрузить ZIP-архив содержимого `out/` и распаковать его в
+`htdocs` через File Manager.
 
-1. Откройте `https://YOUR-SITE.infinityfreeapp.com`.
-2. В DevTools → Network проверьте запросы к `https://...onrender.com/health`.
-3. В консоли не должно быть CORS-ошибок.
-4. Откройте артефакт (HTML/React/SVG/Markdown) и проверьте превью.
+Убедитесь, что `mascot/slime.js` и `mascot/slime.css` попали на сервер:
+маскот загружается отдельными файлами из `public/mascot`.
 
-Если сайт открывается, но API пишет «офлайн»:
+### 4.3. HTTPS
 
-- проверьте `https://...onrender.com/health` напрямую;
-- проверьте `KAEL_ALLOWED_ORIGINS` — там должен быть точный адрес сайта;
-- перезапустите backend после изменения env;
-- убедитесь, что сайт открыт по `https`, а не `http`.
+В панели InfinityFree включите бесплатный SSL для домена и дождитесь выпуска
+сертификата. Затем включите **Force HTTPS**. Backend разрешает только точный
+origin `https://kael-ai.ct.ws`; `http://` и `www` нужно добавлять в
+`KAEL_ALLOWED_ORIGINS` отдельно.
+
+### 4.4. Проверка после загрузки
+
+1. `https://kael-ai.ct.ws` открывается по HTTPS.
+2. Нет ошибок CORS в консоли браузера.
+3. Вход и выход работают.
+4. `/api/me` возвращает `200` и роль.
+5. `/api/chat` отвечает, маскот меняет эмоции.
+6. `/privacy/`, `/terms/` и `/security/` доступны без входа, ссылки в футере
+   лендинга и на экране входа ведут на них.
+7. Заголовки `Content-Security-Policy`, `Strict-Transport-Security` и
+   `X-Content-Type-Options` присутствуют в ответе (Network → Headers).
+8. Обновите страницу с очисткой кэша (`Ctrl+F5`), если видите старый бандл.
 
 ---
 
-## 5. Что уже изменено в проекте
+## 5. Ограничения статического экспорта
 
-| Файл | Назначение |
-| --- | --- |
-| `frontend/next.config.mjs` | `output: "export"`, `trailingSlash`, `images.unoptimized` |
-| `frontend/package.json` | `npm run build` собирает статику, `npm run preview` — локальный просмотр `out/` |
-| `frontend/.env.production.example` | шаблон публичного URL бэкенда и username Telegram-бота |
-| `frontend/scripts/check-production-env.mjs` | защита от сборки с localhost/LAN URL, предупреждение о пустом username бота |
-| `frontend/public/.htaccess` | маршрутизация, 404, кэш и сжатие для InfinityFree |
-| `frontend/components/TelegramAuthProvider.tsx` | вход по `initData`, хранение сессии, экран блокировки |
-| `frontend/components/KaelMascot.tsx` | маскот Spark на экране входа и в туре |
-| `frontend/components/KaelTour.tsx` | локализованный онбординг-тур по интерфейсу |
-| `frontend/components/UserChip.tsx` | аватар и имя пользователя Telegram в шапке |
-| `frontend/lib/api.ts` | `authFetch`, Bearer-токен, сброс сессии при 401 |
-| `frontend/types/telegram.d.ts` | типы Telegram WebApp |
-| `frontend/app/kael-auth.css` | стили экрана входа, маскота и тура |
-| `backend/main.py` | CORS через `KAEL_ALLOWED_ORIGINS` + локальные адреса |
-| `backend/auth.py` | проверка `initData`, сессионный токен, allowlist, `get_current_user` |
-| `backend/.env.example` | пример CORS-переменных и Telegram-секретов |
-| `backend/Procfile` | запуск для Koyeb/buildpack |
-| `backend/Dockerfile` | запуск в Docker/Koyeb/HF Spaces |
-| `backend/.python-version` | Python 3.11.9 |
-| `render.yaml` | Blueprint для Render (rootDir: `backend`, Telegram-секреты) |
+- Нет Next.js middleware и серверного `auth()`. Авторизация на фронтенде —
+  только клиентская проверка UI. Реальная защита — проверка JWT на FastAPI.
+- Нет route handlers `app/api/*`. Все запросы идут напрямую на Render.
+- Clerk работает как SPA: `ClerkProvider` монтируется в браузере, токен
+  берётся через `useAuth().getToken({ template: "kael" })`.
+- `dev_mode` в `/api/chat` разрешён только роли `admin`; клиентская кнопка
+  dev-режима не является средством защиты.
+- CORS настроен без credentials: авторизация идёт заголовком `Authorization`,
+  cookie сессии не используются.
+- Любое изменение `NEXT_PUBLIC_*` требует пересборки и повторной загрузки
+  `out/`.
 
 ---
 
-## 6. Ограничения статического экспорта
+## 6. Диагностика
 
-Текущий фронтенд совместим со статикой: единственный маршрут `/`, данные
-загружаются с бэкенда через `fetch`, состояние живёт на клиенте.
-При доработках помните, что `output: "export"` не поддерживает:
-
-- API routes (`app/api/*`);
-- `middleware.ts`;
-- Server Actions;
-- `cookies()`, `headers()`, `revalidate`, `dynamic = "force-dynamic"`;
-- динамические маршруты без `generateStaticParams`;
-- серверный `next/image` (поэтому включён `unoptimized`).
-
-Если появится серверная логика, её нужно выносить в FastAPI, а не в Next.js.
-
-### Telegram-авторизация
-
-KAEL работает как Telegram Mini App. Отдельной базы пользователей нет: личность
-подтверждает сам Telegram, а сессия живёт в подписанном токене.
-
-Как это устроено:
-
-1. Пользователь открывает бота и получает кнопку «Открыть KAEL» (бот отвечает
-   на `/start`), либо сразу нажимает кнопку меню в чате.
-2. Фронтенд берёт `window.Telegram.WebApp.initData` и отправляет его на
-   `POST /auth/telegram-webapp`.
-3. Бэкенд проверяет подпись `initData` токеном бота (`TELEGRAM_BOT_TOKEN`),
-   проверяет свежесть `auth_date` (не старше 24 часов) и при необходимости
-   сверяет ID с `KAEL_ALLOWED_TG_IDS`.
-4. Бэкенд возвращает временный токен на 7 дней, подписанный `KAEL_JWT_SECRET`.
-   Токен хранится в `localStorage` и отправляется в заголовке
-   `Authorization: Bearer ...`.
-5. `/api/chat` требует этот токен. `/health` остаётся публичным.
-
-Если открыть сайт в обычном браузере, `initData` нет, поэтому показывается экран
-«Доступ только через Telegram Mini App». Это ожидаемое поведение, а не ошибка:
-вход возможен только внутри Telegram, где клиент сам подписывает данные
-пользователя. Регистрация в чате с ботом не нужна — бот только выдаёт кнопку
-запуска Mini App.
-
-#### Webhook бота
-
-Эндпоинт `POST /telegram/webhook` отвечает на `/start` и другие сообщения в
-личке кнопкой «Открыть KAEL». Он проверяет заголовок
-`X-Telegram-Bot-Api-Secret-Token`, поэтому `TELEGRAM_WEBHOOK_SECRET` должен
-совпадать с `secret_token` при регистрации webhook.
-
-Зарегистрируйте webhook один раз после деплоя:
-
-```bash
-curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://kael-api.onrender.com/telegram/webhook",
-    "secret_token": "<TELEGRAM_WEBHOOK_SECRET>",
-    "allowed_updates": ["message"]
-  }'
-```
-
-Проверить статус: `getWebhookInfo`. Если webhook не нужен, его можно удалить
-через `deleteWebhook`.
-
-#### Настройка бота в @BotFather
-
-1. Создайте бота (`/newbot`) или используйте существующего.
-2. Скопируйте токен вида `123456789:AA...` — это `TELEGRAM_BOT_TOKEN`. Токен
-   хранится только на бэкенде и никогда не попадает в статический фронтенд.
-3. Задайте публичный URL сайта: **Bot Settings → Menu Button → Edit menu button
-   URL** → `https://kael-ai.ct.ws`. Кнопка меню открывает KAEL как Mini App.
-4. Username бота (без `@`) пропишите во фронтенде как
-   `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` — он нужен для кнопки «Открыть в
-   Telegram» на экране блокировки.
-
-Telegram открывает Mini App только по HTTPS, поэтому домен должен быть уже
-доступен по `https://` до настройки кнопки меню.
-
-#### Переменные
-
-На Render (backend):
-
-| Переменная | Обязательна | Назначение |
+| Симптом | Причина | Решение |
 | --- | --- | --- |
-| `TELEGRAM_BOT_TOKEN` | да | токен из @BotFather |
-| `TELEGRAM_WEBHOOK_SECRET` | да | секрет заголовка `X-Telegram-Bot-Api-Secret-Token` |
-| `KAEL_JWT_SECRET` | да | подпись сессионных токенов, длинная случайная строка |
-| `KAEL_ALLOWED_TG_IDS` | нет | ID через запятую для закрытой беты; пусто = все |
-
-Во фронтенде (`.env.production`, на этапе сборки):
-
-```dotenv
-NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=your_bot_username
-```
-
-Важно: сначала задайте `TELEGRAM_BOT_TOKEN` и `KAEL_JWT_SECRET` на Render и
-только потом деплойте код с защитой `/api/chat`. Если выложить код раньше,
-вход через Telegram вернёт 500, а обычный браузер останется на экране
-блокировки.
-
-Сессионный токен — не стандартный JWT, а payload в base64url плюс HMAC-SHA256.
-Он проверяется на каждом запросе; allowlist тоже перечитывается каждый раз,
-поэтому удаление ID из `KAEL_ALLOWED_TG_IDS` отзывает доступ сразу, не дожидаясь
-истечения 7 дней.
+| Вместо входа экран «Clerk не настроен» | Пустой `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Заполните ключ и пересоберите фронтенд |
+| `500 CLERK_ISSUER не настроен на сервере` | На Render нет `CLERK_ISSUER` | Добавьте переменную и перезапустите сервис |
+| `401 Недействительный или просроченный токен` | Другой Clerk instance, неверный issuer, истёк токен | Сверьте `CLERK_ISSUER` с Dashboard; выйдите и войдите снова |
+| `403 Источник сессии не разрешён` | Origin нет в `azp`-allowlist | Добавьте домен в `CLERK_AUTHORIZED_PARTIES` или `KAEL_ALLOWED_ORIGINS` |
+| CORS-ошибка в браузере | Origin нет в `KAEL_ALLOWED_ORIGINS` | Укажите точный origin со схемой, без `/` на конце |
+| Роль не меняется после правки metadata | Старый токен в сессии | Выйдите и войдите; проверьте шаблон `kael` |
+| Маскот не появляется | Не загружены `mascot/slime.js` или `slime.css` | Проверьте файлы на InfinityFree и ошибки 404 |
+| Сборка падает на типах | Изменения в API/переводах | `npm run typecheck`, исправьте ошибки |
+| После деплоя старый интерфейс | Кэш браузера или старые файлы | `Ctrl+F5`, удалите старые чанки в `htdocs` |
+| MCP-сервер просит авторизацию по кругу | Redirect URI не совпадает с настройками провайдера | Сверьте `KAEL_PUBLIC_API_URL` / `KAEL_MCP_REDIRECT_URI` и зарегистрированный callback |
+| MCP-токены пропали после redeploy | Эфемерный диск Render | Подключите persistent disk или авторизуйте серверы заново |
+| `/privacy/` открывается, но без стилей | Не загружен `_next/` из новой сборки | Загрузите **всё** содержимое `out/`, удалите старые чанки |
+| CSP блокирует Clerk | Домен Clerk отсутствует в `script-src`/`connect-src` | Обновите `.htaccess` и пересоберите фронтенд |
 
 ---
 
 ## 7. Чек-лист перед публикацией
 
-- [ ] Бэкенд задеплоен, `/health` возвращает `{"status":"ok"}`.
-- [ ] `KAEL_ALLOWED_ORIGINS` содержит точный HTTPS-адрес InfinityFree.
-- [ ] `KAEL_DEV_SECRET` заменён на сильный секрет.
-- [ ] `OPENROUTER_API_KEY` (и/или `GROQ_API_KEY`) задан в панели хостинга.
-- [ ] `TELEGRAM_BOT_TOKEN` задан на Render.
-- [ ] `TELEGRAM_WEBHOOK_SECRET` задан на Render и в `setWebhook`.
-- [ ] `KAEL_JWT_SECRET` задан на Render (длинная случайная строка).
-- [ ] При закрытой бете `KAEL_ALLOWED_TG_IDS` содержит нужные Telegram ID.
-- [ ] `frontend/.env.production` содержит публичный URL бэкенда.
-- [ ] `frontend/.env.production` содержит `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME`.
-- [ ] `.env.local` / `.env.production.local` не перекрывают production-URL при сборке.
-- [ ] `npm run build` завершился успешно, `out/index.html` существует.
-- [ ] В `out/_next/static/chunks/app/*.js` нет `localhost`/`192.168.*`.
-- [ ] Содержимое `out/` загружено в `htdocs`, `.htaccess` на месте.
-- [ ] HTTPS включён, сайт открывается по `https://`.
-- [ ] Кнопка меню в @BotFather ведёт на `https://kael-ai.ct.ws`.
-- [ ] Вход через Telegram открывает приложение, тур и чат работают.
-- [ ] Обычный браузер показывает экран «Доступ только через Telegram Mini App».
-- [ ] Артефакты и превью работают на публичном домене.
+Clerk:
+
+- [ ] Приложение создано, email + password включён.
+- [ ] JWT-шаблон называется `kael` и содержит claim `role`.
+- [ ] Пользователям выставлен `public_metadata.role`.
+- [ ] `CLERK_ISSUER` совпадает с Frontend API URL.
+- [ ] `https://kael-ai.ct.ws` добавлен в allowed origins.
+- [ ] Production instance подтверждён (или осознанно используется dev instance).
+
+Render:
+
+- [ ] `KAEL_ENV=production`.
+- [ ] `KAEL_SECRET_KEY` задан (Blueprint: `generateValue: true`).
+- [ ] `KAEL_TRUST_PROXY_HEADERS=1`.
+- [ ] `KAEL_PUBLIC_API_URL` или `RENDER_EXTERNAL_URL` даёт правильный OAuth callback.
+- [ ] `KAEL_PUBLIC_FRONTEND_URL=https://kael-ai.ct.ws`.
+- [ ] `OPENROUTER_API_KEY`, `GROQ_API_KEY`, `ZEROCAT_API_KEY`, `GEMINI_API_KEY` заданы по необходимости.
+- [ ] `CLERK_ISSUER` задан.
+- [ ] `CLERK_AUTHORIZED_PARTIES` содержит продакшен-origin.
+- [ ] `KAEL_ALLOWED_ORIGINS` содержит `https://kael-ai.ct.ws`.
+- [ ] `/health` отвечает `{"status":"ok"}`.
+- [ ] `/api/me` без токена отвечает `401`.
+- [ ] `CLERK_SECRET_KEY` отсутствует на фронтенде и в статике.
+
+Frontend:
+
+- [ ] `.env.production` содержит backend URL и publishable key.
+- [ ] `npm run theme:light` выполнен после последних изменений UI.
+- [ ] `npm run typecheck` проходит.
+- [ ] `npm run build` создаёт `out/` без ошибок.
+- [ ] В `out/` есть `mascot/slime.js`, `mascot/slime.css` и `.htaccess`.
+- [ ] В `out/` есть `privacy/index.html`, `terms/index.html`, `security/index.html`.
+- [ ] Содержимое `out/` загружено в `htdocs`.
+- [ ] HTTPS включён, старые файлы удалены.
+- [ ] CSP и HSTS приходят в заголовках ответа.
+
+Проверка доступа:
+
+- [ ] `admin` видит dev-режим и повышенные лимиты.
+- [ ] `tester` получает Elite без оплаты.
+- [ ] `user` получает бесплатный тариф.
+- [ ] Выход и повторный вход работают.
+- [ ] Маскот реагирует на thinking, typing, ошибку и клик.
+- [ ] Правовые страницы открываются в приватном окне без входа.
+- [ ] MCP: read-only инструмент выполняется без подтверждения, изменяющий — только после подтверждения.

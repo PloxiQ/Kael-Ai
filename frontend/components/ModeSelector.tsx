@@ -168,23 +168,23 @@ export default function ModeSelector({
         aria-controls={open ? listboxId : undefined}
         aria-label={t("mode.aria", { label: t(selectedMode.label) })}
         title={t(selectedMode.description)}
-        className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#f5576c]/30 disabled:cursor-not-allowed disabled:opacity-50 ${
+        className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/30 disabled:cursor-not-allowed disabled:opacity-50 ${
           value === "balanced"
-            ? "border-white/10 bg-[#07070a]/80 text-zinc-200 hover:border-[#f5576c]/50"
-            : "border-[#f093fb]/30 bg-kael-gradient-soft text-zinc-100 hover:border-[#f093fb]/50"
+            ? "border-[#262626] bg-[#161616]/80 text-zinc-200 hover:border-[#10B981]/50"
+            : "border-[#10B981]/30 bg-[#10B981]/10 text-zinc-100 hover:border-[#10B981]/50"
         }`}
       >
         <TriggerIcon
           size={16}
           strokeWidth={1.6}
-          className={value === "deep" ? "text-[#f7a6ba]" : "text-zinc-400"}
+          className={value === "deep" ? "text-[#34D399]" : "text-zinc-400"}
         />
         <span className="hidden lg:inline">
           {t(selectedMode.label)}
         </span>
         <span
           aria-hidden="true"
-          className="h-1.5 w-1.5 shrink-0 rounded-full bg-kael-gradient shadow-[0_0_10px_rgba(245,87,108,0.5)]"
+          className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#10B981] shadow-none"
         />
       </button>
 
@@ -199,11 +199,11 @@ export default function ModeSelector({
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ type: "spring", stiffness: 380, damping: 30, mass: 0.7 }}
             style={{ transformOrigin: "top right" }}
-            className="fixed left-4 right-4 top-[7rem] z-50 overflow-hidden rounded-2xl border border-white/10 bg-[#07070a]/95 p-2 shadow-[0_30px_90px_-28px_rgba(0,0,0,0.96),0_0_60px_-30px_rgba(245,87,108,0.45)] backdrop-blur-xl sm:absolute sm:left-auto sm:right-0 sm:top-[calc(100%+0.5rem)] sm:w-[min(88vw,320px)]"
+            className="fixed left-4 right-4 top-[7rem] z-50 overflow-hidden rounded-2xl border border-[#262626] bg-[#161616]/95 p-2 shadow-[0_30px_90px_-28px_rgba(0,0,0,0.96)] backdrop-blur-xl sm:absolute sm:left-auto sm:right-0 sm:top-[calc(100%+0.5rem)] sm:w-[min(88vw,320px)]"
           >
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-[#f093fb]/65 to-transparent"
+            className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-[#10B981]/65 to-transparent"
           />
 
           <p className="px-3 pb-1 pt-2 text-sm text-zinc-500">
@@ -227,23 +227,23 @@ export default function ModeSelector({
                   aria-selected={active}
                   onMouseEnter={() => setHighlighted(index)}
                   onClick={() => selectMode(mode.id)}
-                  className={`relative flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition focus:outline-none focus-visible:bg-white/[0.07] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#f5576c]/35 ${
+                  className={`relative flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition focus:outline-none focus-visible:bg-[#1C1C1C] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[#10B981]/35 ${
                     active
-                      ? "bg-kael-gradient-soft"
+                      ? "bg-[#10B981]/10"
                       : current
-                        ? "bg-white/[0.05]"
-                        : "hover:bg-white/[0.035]"
+                        ? "bg-[#1C1C1C]"
+                        : "hover:bg-[#1C1C1C]"
                   }`}
                 >
                   {active && (
-                    <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-kael-gradient" />
+                    <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-[#10B981]" />
                   )}
 
                   <span
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${
                       active
-                        ? "border-[#f093fb]/30 bg-white/[0.06] text-[#f7a6ba]"
-                        : "border-white/[0.08] text-zinc-500"
+                        ? "border-[#10B981]/30 bg-[#1C1C1C] text-[#34D399]"
+                        : "border-[#262626] text-zinc-500"
                     }`}
                   >
                     <Icon size={17} strokeWidth={1.6} />
@@ -266,10 +266,10 @@ export default function ModeSelector({
                     aria-hidden="true"
                     className={`h-1.5 w-1.5 shrink-0 rounded-full ${
                       active
-                        ? "bg-kael-gradient"
+                        ? "bg-[#10B981]"
                         : current
-                          ? "bg-[#f5576c]"
-                          : "bg-white/10"
+                          ? "bg-[#10B981]"
+                          : "bg-[#262626]"
                     }`}
                   />
                 </button>

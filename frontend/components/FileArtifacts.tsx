@@ -288,11 +288,11 @@ export function FileArtifactCard({
   return (
     <section
       aria-label={t("file.aria", { name: artifact.name })}
-      className="kael-topline relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#07070a]/80 shadow-[0_28px_80px_-34px_rgba(0,0,0,0.95)] backdrop-blur-2xl"
+      className="kael-topline relative overflow-hidden rounded-2xl border border-[#262626] bg-[#161616]/80 shadow-[0_28px_80px_-34px_rgba(0,0,0,0.95)] backdrop-blur-2xl"
     >
       <header className="flex flex-col gap-4 px-5 pb-4 pt-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
         <div className="flex min-w-0 items-start gap-4">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#f093fb]/25 bg-kael-gradient-soft text-[#f7a6ba]">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#10B981]/25 bg-[#10B981]/10 text-[#34D399]">
             <Icon size={19} strokeWidth={1.5} />
           </span>
 
@@ -314,10 +314,10 @@ export function FileArtifactCard({
             onClick={() => void copyContent()}
             aria-label={t("file.copyAria")}
             title={t("file.copy")}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-zinc-300 transition hover:border-[#f093fb]/35 hover:bg-white/[0.06] hover:text-white"
+            className="inline-flex items-center gap-2 rounded-lg border border-[#262626] bg-[#1C1C1C] px-3 py-2 text-sm text-zinc-300 transition hover:border-[#10B981]/35 hover:bg-[#1C1C1C] hover:text-white"
           >
             {copyState === "copied" ? (
-              <Check size={16} strokeWidth={1.6} className="text-[#f7a6ba]" />
+              <Check size={16} strokeWidth={1.6} className="text-[#34D399]" />
             ) : copyState === "failed" ? (
               <X size={16} strokeWidth={1.6} className="text-red-400" />
             ) : (
@@ -337,7 +337,7 @@ export function FileArtifactCard({
             onClick={downloadContent}
             aria-label={t("file.downloadAria")}
             title={t("file.download")}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-zinc-300 transition hover:border-[#f5576c]/35 hover:bg-white/[0.06] hover:text-white"
+            className="inline-flex items-center gap-2 rounded-lg border border-[#262626] bg-[#1C1C1C] px-3 py-2 text-sm text-zinc-300 transition hover:border-[#10B981]/35 hover:bg-[#1C1C1C] hover:text-white"
           >
             <Download size={16} strokeWidth={1.6} />
             <span className="hidden sm:inline">{t("file.download")}</span>
@@ -351,7 +351,7 @@ export function FileArtifactCard({
             }
             aria-expanded={expanded}
             title={expanded ? t("file.collapse") : t("file.expand")}
-            className="rounded-lg border border-white/[0.08] bg-white/[0.03] p-2 text-zinc-400 transition hover:border-white/[0.16] hover:bg-white/[0.06] hover:text-white"
+            className="rounded-lg border border-[#262626] bg-[#1C1C1C] p-2 text-zinc-400 transition hover:border-[#3A3A3A] hover:bg-[#1C1C1C] hover:text-white"
           >
             {expanded ? (
               <ChevronUp size={16} strokeWidth={1.6} />
@@ -362,7 +362,7 @@ export function FileArtifactCard({
         </div>
       </header>
 
-      <div className="relative border-t border-white/[0.06]">
+      <div className="relative border-t border-[#262626]">
         <pre
           className={`overflow-auto px-5 py-4 font-mono text-[15px] leading-7 text-zinc-300 sm:px-6 ${
             expanded ? "max-h-[560px]" : "max-h-44 overflow-hidden"
@@ -373,7 +373,7 @@ export function FileArtifactCard({
         {!expanded && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#07070a] via-[#07070a]/80 to-transparent"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#161616] via-[#161616]/80 to-transparent"
           />
         )}
       </div>
