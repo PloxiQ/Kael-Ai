@@ -1460,9 +1460,10 @@ def _groq_too_large(tokens: int) -> HTTPException:
         status_code=413,
         detail=(
             "Groq's free tier allows 8,000 tokens per minute, and this "
-            f"request is about {tokens:,} tokens including MCP tool "
-            "definitions and the reply budget. Disable MCP servers for this "
-            "chat, remove attachments, or switch to OpenRouter or Gemini."
+            f"request is about {tokens:,} tokens including attachments, MCP "
+            "tool definitions, and the reply budget. Shorten the message, "
+            "remove attachments, disable MCP servers for this chat, or "
+            "switch to OpenRouter or Gemini."
         ),
     )
 
