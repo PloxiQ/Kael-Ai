@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
+import type { ApiStatus } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import {
   formatNumber,
@@ -34,7 +35,7 @@ type SidebarProps = {
   mobileOpen: boolean;
   sessions: SidebarSession[];
   activeSessionId: string;
-  isOnline: boolean;
+  apiStatus: ApiStatus;
   busy: boolean;
   usage: UsageState;
   onToggle: () => void;
@@ -64,7 +65,7 @@ export default function Sidebar({
   mobileOpen,
   sessions,
   activeSessionId,
-  isOnline,
+  apiStatus,
   busy,
   usage,
   onToggle,
@@ -79,6 +80,13 @@ export default function Sidebar({
   const remaining = remainingTokens(usage);
   const { locale, t } = useI18n();
   const tierName = t(TIER_TRANSLATION_KEYS[tier.id].name);
+  const apiLabel = t(
+    apiStatus === "online"
+      ? "sidebar.apiOnline"
+      : apiStatus === "checking"
+        ? "sidebar.apiChecking"
+        : "sidebar.apiOffline",
+  );
 
   const renderPanel = (isCollapsed: boolean) => (
     <>
@@ -269,28 +277,48 @@ export default function Sidebar({
       >
         {isCollapsed ? (
           <span
-            title={isOnline ? t("sidebar.apiOnline") : t("sidebar.apiOffline")}
+            title={apiLabel}
             className={`h-2 w-2 rounded-full ${
-              isOnline ? "kael-pulse bg-[#10B981]" : "bg-zinc-700"
+              apiStatus === "online"
+                ? "kael-pulse bg-[#10B981]"
+                : apiStatus === "checking"
+                  ? "kael-pulse bg-zinc-500"
+                  : "bg-zinc-700"
             }`}
           />
         ) : (
           <div className="flex items-center gap-2.5">
-            {isOnline ? (
-              <Wifi size={15} strokeWidth={1.5} className="text-[#34D399]" />
-            ) : (
+            {apiStatus === "offline" ? (
               <WifiOff size={15} strokeWidth={1.5} className="text-zinc-600" />
+            ) : (
+              <Wifi
+                size={15}
+                strokeWidth={1.5}
+                className={
+                  apiStatus === "online" ? "text-[#34D399]" : "text-zinc-500"
+                }
+              />
             )}
             <span
+              role="status"
+              aria-live="polite"
               className={`text-sm ${
-                isOnline ? "text-zinc-400" : "text-zinc-600"
+                apiStatus === "online"
+                  ? "text-zinc-400"
+                  : apiStatus === "checking"
+                    ? "text-zinc-500"
+                    : "text-zinc-600"
               }`}
             >
-              {isOnline ? t("sidebar.apiOnline") : t("sidebar.apiOffline")}
+              {apiLabel}
             </span>
             <span
               className={`ml-auto h-1.5 w-1.5 rounded-full ${
-                isOnline ? "kael-pulse bg-[#10B981]" : "bg-zinc-700"
+                apiStatus === "online"
+                  ? "kael-pulse bg-[#10B981]"
+                  : apiStatus === "checking"
+                    ? "kael-pulse bg-zinc-500"
+                    : "bg-zinc-700"
               }`}
             />
           </div>

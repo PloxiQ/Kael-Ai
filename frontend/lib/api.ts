@@ -7,6 +7,9 @@ import {
 
 export type KaelRole = "admin" | "tester" | "user";
 
+/** Backend reachability shown in the header and sidebar. */
+export type ApiStatus = "checking" | "online" | "offline";
+
 export type MeResponse = {
   id: string;
   role: KaelRole;

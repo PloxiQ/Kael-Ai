@@ -32,6 +32,7 @@ export function localeFor(language: Language): string {
 const ru = {
   "app.online": "онлайн",
   "app.offline": "офлайн",
+  "app.checking": "запускается",
 
   "header.openMenu": "Открыть меню",
   "header.chatHistory": "История диалога",
@@ -325,6 +326,7 @@ const ru = {
   "sidebar.empty": "Пока пусто. Первый вопрос — внизу.",
   "sidebar.apiOnline": "API онлайн",
   "sidebar.apiOffline": "API офлайн",
+  "sidebar.apiChecking": "API запускается",
   "sidebar.tierAria": "Тариф и лимиты",
   "sidebar.tierAriaName": "Тариф и лимиты: {tier}",
   "sidebar.expand": "Развернуть сайдбар",
@@ -736,6 +738,7 @@ export type Translate = (
 const uk: Record<TranslationKey, string> = {
   "app.online": "онлайн",
   "app.offline": "офлайн",
+  "app.checking": "запускається",
 
   "header.openMenu": "Відкрити меню",
   "header.chatHistory": "Історія діалогу",
@@ -1023,6 +1026,7 @@ const uk: Record<TranslationKey, string> = {
   "sidebar.empty": "Поки порожньо. Перше питання — внизу.",
   "sidebar.apiOnline": "API онлайн",
   "sidebar.apiOffline": "API офлайн",
+  "sidebar.apiChecking": "API запускається",
   "sidebar.tierAria": "Тариф і ліміти",
   "sidebar.tierAriaName": "Тариф і ліміти: {tier}",
   "sidebar.expand": "Розгорнути бічну панель",
@@ -1431,6 +1435,7 @@ const uk: Record<TranslationKey, string> = {
 const en: Record<TranslationKey, string> = {
   "app.online": "online",
   "app.offline": "offline",
+  "app.checking": "starting",
 
   "header.openMenu": "Open menu",
   "header.chatHistory": "Chat history",
@@ -1718,6 +1723,7 @@ const en: Record<TranslationKey, string> = {
   "sidebar.empty": "Empty for now. Your first question goes below.",
   "sidebar.apiOnline": "API online",
   "sidebar.apiOffline": "API offline",
+  "sidebar.apiChecking": "API starting",
   "sidebar.tierAria": "Tier and limits",
   "sidebar.tierAriaName": "Tier and limits: {tier}",
   "sidebar.expand": "Expand sidebar",

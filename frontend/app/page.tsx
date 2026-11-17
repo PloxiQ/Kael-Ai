@@ -31,7 +31,12 @@ import { useKaelAuth } from "../components/auth/KaelAuthProvider";
 import LegalLinks from "../components/legal/LegalLinks";
 import McpApprovalPanel from "../components/mcp/McpApprovalPanel";
 import McpTrace from "../components/mcp/McpTrace";
-import { authFetch, isProvidersResponse, type ProvidersResponse } from "../lib/api";
+import {
+  authFetch,
+  isProvidersResponse,
+  type ApiStatus,
+  type ProvidersResponse,
+} from "../lib/api";
 import {
   MAX_ATTACHMENTS,
   MAX_TOTAL_ATTACHMENT_BYTES,
@@ -145,6 +150,9 @@ const BACKEND_URL = (
 ).replace(/\/$/, "");
 const REQUEST_TIMEOUT_MS = 120_000;
 const HEALTH_CHECK_INTERVAL_MS = 20_000;
+const HEALTH_CHECK_RETRY_MS = 4_000;
+const HEALTH_CHECK_TIMEOUT_MS = 45_000;
+const HEALTH_CHECK_FAILURES_BEFORE_OFFLINE = 2;
 const MAX_SESSIONS = 40;
 
 const STORAGE_SESSIONS = "kael-sessions";
@@ -644,7 +652,7 @@ export default function ChatPage() {
   const [isThinking, setIsThinking] = useState(false);
   const [mascotPhase, setMascotPhase] = useState<MascotPhase>("idle");
   const [mascotMood, setMascotMood] = useState<SlimeMood>("happy");
-  const [isOnline, setIsOnline] = useState(false);
+  const [apiStatus, setApiStatus] = useState<ApiStatus>("checking");
   const [nextMessageId, setNextMessageId] = useState(1);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -1006,31 +1014,115 @@ export default function ChatPage() {
 
   useEffect(() => {
     let mounted = true;
+    let timer: number | null = null;
+    let controller: AbortController | null = null;
+    let running = false;
+    let failures = 0;
+
+    const schedule = (delay: number) => {
+      if (!mounted) {
+        return;
+      }
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+      timer = window.setTimeout(() => void checkHealth(), delay);
+    };
+
+    const recordFailure = () => {
+      failures =
+        typeof navigator === "undefined" || navigator.onLine
+          ? failures + 1
+          : HEALTH_CHECK_FAILURES_BEFORE_OFFLINE;
+    };
 
     const checkHealth = async () => {
+      if (!mounted || running) {
+        return;
+      }
+
+      running = true;
+      const requestController = new AbortController();
+      controller = requestController;
+      const timeoutId = window.setTimeout(
+        () => requestController.abort(),
+        HEALTH_CHECK_TIMEOUT_MS,
+      );
+
       try {
         const response = await fetch(`${BACKEND_URL}/health`, {
           cache: "no-store",
+          signal: requestController.signal,
         });
-        if (mounted) {
-          setIsOnline(response.ok);
+        if (!mounted) {
+          return;
+        }
+        if (response.ok) {
+          failures = 0;
+          setApiStatus("online");
+        } else {
+          recordFailure();
         }
       } catch {
         if (mounted) {
-          setIsOnline(false);
+          recordFailure();
+        }
+      } finally {
+        window.clearTimeout(timeoutId);
+        controller = null;
+        running = false;
+
+        if (!mounted) {
+          return;
+        }
+
+        if (failures >= HEALTH_CHECK_FAILURES_BEFORE_OFFLINE) {
+          setApiStatus("offline");
+          schedule(HEALTH_CHECK_INTERVAL_MS);
+        } else if (failures > 0) {
+          schedule(HEALTH_CHECK_RETRY_MS);
+        } else {
+          schedule(HEALTH_CHECK_INTERVAL_MS);
         }
       }
     };
 
+    const handleOffline = () => {
+      failures = HEALTH_CHECK_FAILURES_BEFORE_OFFLINE;
+      setApiStatus("offline");
+      controller?.abort();
+      if (timer !== null) {
+        window.clearTimeout(timer);
+        timer = null;
+      }
+    };
+
+    const handleOnline = () => {
+      failures = 0;
+      setApiStatus((current) => (current === "online" ? "online" : "checking"));
+      schedule(0);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        schedule(0);
+      }
+    };
+
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    document.addEventListener("visibilitychange", handleVisibility);
     void checkHealth();
-    const interval = window.setInterval(
-      () => void checkHealth(),
-      HEALTH_CHECK_INTERVAL_MS,
-    );
 
     return () => {
       mounted = false;
-      window.clearInterval(interval);
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+      controller?.abort();
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, []);
 
@@ -1592,7 +1684,7 @@ export default function ChatPage() {
           mobileOpen={mobileSidebarOpen}
           sessions={sessions}
           activeSessionId={activeSessionId}
-          isOnline={isOnline}
+          apiStatus={apiStatus}
           busy={isThinking}
           usage={usage}
           onToggle={() => {
@@ -1636,11 +1728,19 @@ export default function ChatPage() {
               <div className="hidden items-center gap-2 sm:flex">
                 <span
                   className={`h-1.5 w-1.5 rounded-full ${
-                    isOnline ? "kael-pulse bg-[#10B981]" : "bg-zinc-700"
+                    apiStatus === "online"
+                      ? "kael-pulse bg-[#10B981]"
+                      : apiStatus === "checking"
+                        ? "kael-pulse bg-zinc-500"
+                        : "bg-zinc-700"
                   }`}
                 />
                 <span className="text-sm text-zinc-500">
-                  {isOnline ? t("app.online") : t("app.offline")}
+                  {apiStatus === "online"
+                    ? t("app.online")
+                    : apiStatus === "checking"
+                      ? t("app.checking")
+                      : t("app.offline")}
                 </span>
               </div>
             </div>
