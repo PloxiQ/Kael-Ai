@@ -1261,6 +1261,9 @@ MAX_TOOL_ROUNDS = 4
 MAX_TOOL_CALLS = 12
 MAX_TOOL_CALLS_PER_ROUND = 8
 MAX_TOOL_ARGUMENT_CHARS = 32_000
+# Groq's free tier enforces a tight tokens-per-minute budget, so a raw 60k
+# character tool result can turn the follow-up model call into HTTP 413.
+GROQ_TOOL_OUTPUT_CHARS = 8_000
 MCP_APPROVAL_TTL_SECONDS = 600
 
 
@@ -1908,6 +1911,15 @@ def _execute_tool_plans(
                 output, is_error = mcp_client.call_server_tool(
                     server, plan.tool_name, plan.arguments
                 )
+                if (
+                    state.provider == "groq"
+                    and len(output) > GROQ_TOOL_OUTPUT_CHARS
+                ):
+                    output = (
+                        output[:GROQ_TOOL_OUTPUT_CHARS]
+                        + "\n\n[tool output truncated by KAEL for the "
+                        "current model]"
+                    )
                 status = "error" if is_error else "ok"
                 error_message = (
                     "Tool reported an error." if is_error else None
