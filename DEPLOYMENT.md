@@ -268,6 +268,10 @@ curl.exe -i https://kael-api-xxxx.onrender.com/api/me
 - Для прогрева можно пинговать `/health` через UptimeRobot или cron-job.org.
 - После изменения переменных нужен **Manual Deploy → Restart service**:
   Render не перезапускает процесс автоматически.
+- Auto-deploy по push в GitHub может не срабатывать, если Render потерял
+  webhook репозитория. Надёжный путь: запушьте коммит, откройте
+  **Deploys → Manual Deploy → Deploy latest commit** и дождитесь `Deploy
+  succeeded`. В `Events` источник такого деплоя — `Manually triggered`.
 
 ---
 
