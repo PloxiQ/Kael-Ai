@@ -27,7 +27,7 @@ from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
@@ -148,8 +148,11 @@ def _resolve_host(host: str, port: int) -> list[ipaddress._BaseAddress]:
     return addresses
 
 
-def validate_outbound_url(raw_url: str) -> str:
-    """Validate a user-supplied URL and return its normalized form.
+def _validate_outbound_url(
+    raw_url: str,
+) -> tuple[str, list[ipaddress._BaseAddress]]:
+    """Validate a user-supplied URL and return its normalized form plus
+    the resolved addresses that were checked.
 
     Rejects credentials in the URL, non-HTTP schemes, localhost and every
     private/reserved address range, including cloud metadata endpoints.
@@ -209,7 +212,7 @@ def validate_outbound_url(raw_url: str) -> str:
     if parts.port:
         netloc = f"{host_for_url}:{parts.port}"
 
-    return urlunsplit(
+    normalized = urlunsplit(
         (
             parts.scheme.lower(),
             netloc,
@@ -218,6 +221,52 @@ def validate_outbound_url(raw_url: str) -> str:
             "",
         )
     )
+    return normalized, addresses
+
+
+def validate_outbound_url(raw_url: str) -> str:
+    """Validate a user-supplied URL and return its normalized form."""
+
+    normalized, _ = _validate_outbound_url(raw_url)
+    return normalized
+
+
+def _pin_outbound_target(url: str) -> tuple[str, str, str | None]:
+    """Rewrite a validated URL to connect to one pre-checked IP address.
+
+    Pinning closes the DNS-rebinding window between validation and the
+    actual TCP connection: the request never resolves the hostname again.
+    The original hostname is preserved in the ``Host`` header, and HTTPS
+    keeps it as the TLS SNI/verification name.
+
+    Returns ``(pinned_url, host_header, sni_hostname)``.
+    """
+
+    normalized, addresses = _validate_outbound_url(url)
+    parts = urlsplit(normalized)
+    host = parts.hostname or ""
+    if not host or not addresses:
+        raise OutboundUrlError("URL has no usable address.")
+
+    address = next(
+        (item for item in addresses if item.version == 4), addresses[0]
+    )
+    ip_text = str(address)
+    ip_for_url = f"[{ip_text}]" if ":" in ip_text else ip_text
+    netloc = ip_for_url
+    if parts.port:
+        netloc = f"{ip_for_url}:{parts.port}"
+
+    pinned_url = urlunsplit(
+        (parts.scheme, netloc, parts.path or "/", parts.query, "")
+    )
+
+    host_header = f"[{host}]" if ":" in host else host
+    if parts.port:
+        host_header = f"{host_header}:{parts.port}"
+
+    sni_hostname = host if parts.scheme == "https" else None
+    return pinned_url, host_header, sni_hostname
 
 
 def safe_request(
@@ -233,8 +282,15 @@ def safe_request(
 ) -> SafeResponse:
     """Perform an SSRF-safe HTTP request with bounded response size."""
 
-    current = validate_outbound_url(url)
+    logical_url = url
+    current, host_header, sni_hostname = _pin_outbound_target(logical_url)
     current_method = method.upper()
+    request_headers = {
+        key: value
+        for key, value in (headers or {}).items()
+        if key.lower() != "host"
+    }
+    request_headers["Host"] = host_header
 
     for redirect_count in range(MAX_REDIRECTS + 1):
         try:
@@ -245,9 +301,14 @@ def safe_request(
                 with client.stream(
                     current_method,
                     current,
-                    headers=dict(headers or {}),
+                    headers=request_headers,
                     json=json_body,
                     content=body,
+                    extensions=(
+                        {"sni_hostname": sni_hostname}
+                        if sni_hostname
+                        else None
+                    ),
                 ) as response:
                     if (
                         follow_redirects
@@ -260,7 +321,17 @@ def safe_request(
                             raise OutboundUrlError(
                                 "Redirect response has no Location header."
                             )
-                        current = validate_outbound_url(str(location))
+                        next_url = urljoin(logical_url, str(location))
+                        current, host_header, sni_hostname = (
+                            _pin_outbound_target(next_url)
+                        )
+                        logical_url = next_url
+                        request_headers = {
+                            key: value
+                            for key, value in request_headers.items()
+                            if key.lower() != "host"
+                        }
+                        request_headers["Host"] = host_header
                         if response.status_code == 303:
                             current_method = "GET"
                             json_body = None
