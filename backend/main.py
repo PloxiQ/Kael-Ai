@@ -900,17 +900,23 @@ def _request_openai_compatible(
         default_headers=default_headers,
     )
     max_tokens = DEV_MAX_TOKENS if dev_mode else MODE_MAX_TOKENS[mode]
+    messages = [
+        {
+            "role": "system",
+            "content": _system_prompt(mode, language, personalization),
+        },
+        {"role": "user", "content": content},
+    ]
+
+    if provider == "groq":
+        estimated = _groq_request_tokens(messages, [], max_tokens)
+        if estimated > GROQ_REQUEST_TOKEN_BUDGET:
+            raise _groq_too_large(estimated)
 
     try:
         completion = client.chat.completions.create(
             model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": _system_prompt(mode, language, personalization),
-                },
-                {"role": "user", "content": content},
-            ],
+            messages=messages,
             temperature=MODE_TEMPERATURE[mode],
             max_tokens=max_tokens,
         )
@@ -937,6 +943,17 @@ def _request_openai_compatible(
             detail = (
                 f"{label} could not find the model '{model}'. "
                 "Check the model name."
+            )
+        elif error.status_code == 413:
+            detail = (
+                f"Groq's free tier allows {GROQ_TPM_LIMIT:,} tokens per "
+                "minute, and this request is too large. Shorten the message, "
+                "remove attachments, or switch to OpenRouter or Gemini."
+                if provider == "groq"
+                else (
+                    f"{label} rejected the request as too large. Shorten the "
+                    "message or remove attachments."
+                )
             )
         elif error.status_code == 429:
             detail = f"{label} rate limit reached. Wait a moment and try again."
@@ -1261,9 +1278,13 @@ MAX_TOOL_ROUNDS = 4
 MAX_TOOL_CALLS = 12
 MAX_TOOL_CALLS_PER_ROUND = 8
 MAX_TOOL_ARGUMENT_CHARS = 32_000
-# Groq's free tier enforces a tight tokens-per-minute budget, so a raw 60k
-# character tool result can turn the follow-up model call into HTTP 413.
+# Groq's free tier enforces a tight tokens-per-minute budget (8k TPM for the
+# gpt-oss models), so a raw 60k character tool result or a large MCP tool
+# schema can turn a request into HTTP 413. Keep both the result and the whole
+# request under the budget, and explain the limit instead of failing opaquely.
 GROQ_TOOL_OUTPUT_CHARS = 8_000
+GROQ_TPM_LIMIT = 8_000
+GROQ_REQUEST_TOKEN_BUDGET = 7_200
 MCP_APPROVAL_TTL_SECONDS = 600
 
 
@@ -1418,6 +1439,34 @@ def _messages_char_count(messages: list[dict[str, Any]]) -> int:
     return total
 
 
+def _groq_request_tokens(
+    messages: list[dict[str, Any]],
+    tools: list[dict[str, Any]],
+    max_tokens: int,
+) -> int:
+    """Estimate the whole Groq request, which counts tools and max_tokens."""
+
+    characters = _messages_char_count(messages)
+    if tools:
+        try:
+            characters += len(json.dumps(tools, ensure_ascii=False))
+        except (TypeError, ValueError):
+            pass
+    return max(1, characters // 4) + max_tokens
+
+
+def _groq_too_large(tokens: int) -> HTTPException:
+    return HTTPException(
+        status_code=413,
+        detail=(
+            "Groq's free tier allows 8,000 tokens per minute, and this "
+            f"request is about {tokens:,} tokens including MCP tool "
+            "definitions and the reply budget. Disable MCP servers for this "
+            "chat, remove attachments, or switch to OpenRouter or Gemini."
+        ),
+    )
+
+
 def _normalize_openai_assistant(message: Any) -> dict[str, Any]:
     content = message.content if isinstance(message.content, str) else ""
     calls: list[dict[str, Any]] = []
@@ -1508,6 +1557,11 @@ def _call_model_with_tools(
 
     label = PROVIDER_LABELS[provider]
     max_tokens = DEV_MAX_TOKENS if dev_mode else MODE_MAX_TOKENS[mode]
+
+    if provider == "groq":
+        estimated = _groq_request_tokens(messages, tools, max_tokens)
+        if estimated > GROQ_REQUEST_TOKEN_BUDGET:
+            raise _groq_too_large(estimated)
 
     if provider == "ollama":
         base_url = os.getenv(
@@ -1658,12 +1712,24 @@ def _call_model_with_tools(
             detail = f"{label} rejected the API key."
         elif error.status_code == 404:
             detail = f"{label} could not find the model '{model}'."
+        elif error.status_code == 413:
+            detail = (
+                f"Groq's free tier allows {GROQ_TPM_LIMIT:,} tokens per "
+                "minute, and this request is too large. Disable MCP servers "
+                "for this chat or switch to OpenRouter or Gemini."
+                if provider == "groq"
+                else (
+                    f"{label} rejected the request as too large. Disable MCP "
+                    "servers for this chat or shorten the message."
+                )
+            )
         elif error.status_code == 429:
             detail = f"{label} rate limit reached. Wait a moment."
         elif error.status_code == 400 and tools:
             detail = (
                 f"{label} rejected the tool-enabled request. "
-                "The selected model may not support tool calls; choose another model."
+                "The selected model may not support tool calls; choose "
+                "another model or disable MCP for this chat."
             )
         elif error.status_code >= 500:
             detail = f"{label} is temporarily unavailable."
