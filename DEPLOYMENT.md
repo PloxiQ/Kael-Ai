@@ -386,6 +386,14 @@ htdocs/
 Проще всего загрузить ZIP-архив содержимого `out/` и распаковать его в
 `htdocs` через File Manager.
 
+На Windows не собирайте архив через `Compress-Archive`: PowerShell 5.1
+записывает разделители `\`, и распаковщик на сервере пропускает вложенные
+папки (`_next`, `mascot`, `privacy`, `terms`, `security`). Используйте Python:
+
+```
+python -c "import shutil; shutil.make_archive('kael-site', 'zip', 'frontend/out')"
+```
+
 В архиве есть скрытый файл `.htaccess`. Включите показ скрытых файлов в File
 Manager или загрузите его отдельно: без него не будет HSTS, CSP и остальных
 заголовков безопасности.
@@ -413,9 +421,11 @@ origin `https://kael-ai.ct.ws`; `http://` и `www` нужно добавлять
 5. `/api/chat` отвечает, маскот меняет эмоции.
 6. `/privacy/`, `/terms/` и `/security/` доступны без входа, ссылки в футере
    лендинга и на экране входа ведут на них.
-7. Заголовки `Content-Security-Policy`, `Strict-Transport-Security` и
+7. Несуществующий адрес отдаёт `404` и локализованную страницу «Страница не
+   найдена», а не экран входа.
+8. Заголовки `Content-Security-Policy`, `Strict-Transport-Security` и
    `X-Content-Type-Options` присутствуют в ответе (Network → Headers).
-8. Обновите страницу с очисткой кэша (`Ctrl+F5`), если видите старый бандл.
+9. Обновите страницу с очисткой кэша (`Ctrl+F5`), если видите старый бандл.
 
 ---
 
