@@ -481,6 +481,12 @@ const ru = {
   "legal.footer":
     "KAEL — независимый AI-интерфейс. Документы описывают текущую практику сервиса.",
 
+  "notFound.eyebrow": "Ошибка 404",
+  "notFound.title": "Страница не найдена",
+  "notFound.description":
+    "Такого адреса нет в KAEL. Возможно, ссылка устарела или в ней опечатка.",
+  "notFound.back": "Вернуться на главную",
+
   "settings.eyebrow": "Настройки",
   "settings.title": "Настройки KAEL",
   "settings.subtitle": "Аккаунт, клиент и персонализация ассистента.",
@@ -1175,6 +1181,12 @@ const uk: Record<TranslationKey, string> = {
   "legal.footer":
     "KAEL — незалежний AI-інтерфейс. Документи описують поточну практику сервісу.",
 
+  "notFound.eyebrow": "Помилка 404",
+  "notFound.title": "Сторінку не знайдено",
+  "notFound.description":
+    "Такої адреси немає в KAEL. Можливо, посилання застаріло або містить помилку.",
+  "notFound.back": "Повернутися на головну",
+
   "settings.eyebrow": "Налаштування",
   "settings.title": "Налаштування KAEL",
   "settings.subtitle": "Акаунт, клієнт і персоналізація асистента.",
@@ -1863,6 +1875,12 @@ const en: Record<TranslationKey, string> = {
   "legal.contactTelegram": "Message on Telegram",
   "legal.footer":
     "KAEL is an independent AI interface. These documents describe current service practice.",
+
+  "notFound.eyebrow": "Error 404",
+  "notFound.title": "Page not found",
+  "notFound.description":
+    "This address does not exist in KAEL. The link may be outdated or contain a typo.",
+  "notFound.back": "Back to home",
 
   "settings.eyebrow": "Settings",
   "settings.title": "KAEL settings",

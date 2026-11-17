@@ -41,6 +41,9 @@ const PUBLISHABLE_KEY = (
 /** Public pages that render without a Clerk session. */
 const PUBLIC_ROUTES = new Set(["/privacy", "/terms", "/security"]);
 
+/** Every route the app actually serves. Anything else is Next's 404 page. */
+const APP_ROUTES = new Set(["/", ...PUBLIC_ROUTES]);
+
 const CLERK_APPEARANCE: NonNullable<ClerkProviderProps["appearance"]> = {
   variables: {
     colorPrimary: "var(--kael-accent)",
@@ -376,6 +379,12 @@ export function KaelAuthProvider({ children }: { children: ReactNode }) {
   // Legal pages are public: they must stay readable without a Clerk session and
   // must not expose account state.
   if (PUBLIC_ROUTES.has(normalizedPath)) {
+    return <>{children}</>;
+  }
+
+  // Unknown paths must reach Next's not-found boundary instead of the sign-in
+  // gate, otherwise a 404 looks like a login prompt.
+  if (!APP_ROUTES.has(normalizedPath)) {
     return <>{children}</>;
   }
 
